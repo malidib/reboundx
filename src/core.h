@@ -86,6 +86,7 @@ void rebx_lense_thirring(struct reb_simulation* const sim, struct rebx_force* co
 void rebx_modify_mass(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_integrate_force(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_modify_orbits_direct(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
+void rebx_gravitational_wave_damping(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_track_min_distance(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 
 /****************************************
