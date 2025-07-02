@@ -144,6 +144,7 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "lt_p_haty", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "lt_p_hatz", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "lt_c", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "gw_c", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
@@ -435,6 +436,10 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
     }
     else if (strcmp(name, "modify_orbits_direct") == 0){
         operator->step_function = rebx_modify_orbits_direct;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
+    else if (strcmp(name, "gravitational_wave_damping") == 0){
+        operator->step_function = rebx_gravitational_wave_damping;
         operator->operator_type = REBX_OPERATOR_UPDATER;
     }
     else if (strcmp(name, "track_min_distance") == 0){
