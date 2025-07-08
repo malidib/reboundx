@@ -54,6 +54,7 @@
  * ============================ =========== ===============================================
  * rlmt_donor (int)             Yes         Index of donor particle
  * rlmt_accretor (int)          Yes         Index of accretor particle
+ * rlmt_loss_fraction (double)  No          Fraction of lost mass that escapes the system
  * ============================ =========== ===============================================
  *
  * **Particle Parameters**
@@ -98,6 +99,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
 
     const double* Hp_ptr = rebx_get_param(rebx, donor->ap, "rlmt_Hp");
     const double* mdot0_ptr = rebx_get_param(rebx, donor->ap, "rlmt_mdot0");
+    const double* loss_frac_ptr = rebx_get_param(rebx, operator->ap, "rlmt_loss_fraction");
 
     if (Hp_ptr == NULL || mdot0_ptr == NULL){
         rebx_error(rebx, "Need to set rlmt_Hp and rlmt_mdot0 on donor particle.\n");
@@ -106,6 +108,15 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
 
     const double Hp = *Hp_ptr;
     const double mdot0 = *mdot0_ptr;
+    double loss_frac = 0.;
+    if (loss_frac_ptr != NULL){
+        loss_frac = *loss_frac_ptr;
+    }
+    if (loss_frac < 0.){
+        loss_frac = 0.;
+    } else if (loss_frac > 1.){
+        loss_frac = 1.;
+    }
 
     const double dx = donor->x - accretor->x;
     const double dy = donor->y - accretor->y;
@@ -124,8 +135,11 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
         dM = -donor->m; // remove remaining mass only once
     }
 
-    donor->m += dM;
-    accretor->m -= dM;
+    const double mass_loss = -dM; // positive amount of mass leaving donor
+    const double mass_accreted = mass_loss * (1. - loss_frac);
+
+    donor->m -= mass_loss;
+    accretor->m += mass_accreted;
 
     // Stop accretion once the donor has lost all of its mass. The donor
     // particle is removed from the simulation and the operator itself is

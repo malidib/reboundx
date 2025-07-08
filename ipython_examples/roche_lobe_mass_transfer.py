@@ -15,6 +15,7 @@ rebx.add_operator(rl)
 
 rl.params['rlmt_donor'] = 1
 rl.params['rlmt_accretor'] = 0
+rl.params['rlmt_loss_fraction'] = 0.2
 sim.particles[1].params['rlmt_Hp'] = 5e-4
 sim.particles[1].params['rlmt_mdot0'] = 1e-5
 
