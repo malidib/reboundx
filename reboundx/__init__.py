@@ -48,5 +48,6 @@ from .extras import Extras, Param, Node, Force, Operator, integrators, Interpola
 from .simulationarchive import Simulationarchive
 from .tools import coordinates, install_test
 from .params import Params
+from . import stellar_effects
 
-__all__ = ["__version__", "__build__", "__githash__", "Extras", "Simulationarchive", "Param", "Interpolator", "Params", "coordinates", "integrators"]
+__all__ = ["__version__", "__build__", "__githash__", "Extras", "Simulationarchive", "Param", "Interpolator", "Params", "coordinates", "integrators", "stellar_effects"]
