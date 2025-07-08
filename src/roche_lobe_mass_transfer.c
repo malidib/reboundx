@@ -117,10 +117,27 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     const double rl = r * (0.49*q13*q13) / (0.6*q13*q13 + log(1.+q13));
     const double Rd = donor->r;
 
-    const double mdot = -mdot0 * exp((Rd - rl)/Hp);
 
-    donor->m += mdot * dt;
-    accretor->m -= mdot * dt;
+    const double mdot = -mdot0 * exp((Rd - rl)/Hp); // negative for mass loss
+    double dM = mdot * dt;
+    if (donor->m + dM <= 0.){
+        dM = -donor->m; // remove remaining mass only once
+    }
+
+    donor->m += dM;
+    accretor->m -= dM;
+
+    // Stop accretion once the donor has lost all of its mass. The donor
+    // particle is removed from the simulation and the operator itself is
+    // detached so it no longer runs.
+
+    if (donor->m <= 0.){
+        reb_simulation_remove_particle(sim, donor_idx, 1);
+        rebx_remove_operator(rebx, operator);
+        reb_simulation_move_to_com(sim);
+        return;
+    }
+
 
     reb_simulation_move_to_com(sim);
 }

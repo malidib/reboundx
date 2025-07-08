@@ -57,7 +57,9 @@ class build_ext(_build_ext):
         print("***", rebdir, "***", sitepackagesdir, "***", editable_rebdir, "***")
         self.include_dirs.append(rebdir)
         #self.include_dirs.append(editable_rebdir)
+
         sources = [ 'src/interpolation.c', 'src/modify_orbits_forces.c', 'src/input.c', 'src/steppers.c', 'src/integrator_rk4.c', 'src/gr_potential.c', 'src/exponential_migration.c', 'src/integrate_force.c', 'src/integrator_implicit_midpoint.c', 'src/modify_orbits_direct.c', 'src/inner_disk_edge.c', 'src/track_min_distance.c', 'src/tides_spin.c', 'src/output.c', 'src/gas_dynamical_friction.c', 'src/gr.c', 'src/stochastic_forces.c', 'src/modify_mass.c', 'src/gas_damping_timescale.c', 'src/type_I_migration.c', 'src/radiation_forces.c', 'src/integrator_rk2.c', 'src/gravitational_harmonics.c', 'src/linkedlist.c', 'src/roche_lobe_mass_transfer.c', 'src/core.c', 'src/gr_full.c', 'src/central_force.c', 'src/integrator_euler.c', 'src/lense_thirring.c', 'src/yarkovsky_effect.c', 'src/tides_constant_time_lag.c', 'src/rebxtools.c'],
+        mad-codex
         
         self.library_dirs.append(rebdir+'/../')
         self.library_dirs.append(sitepackagesdir)
@@ -90,7 +92,9 @@ if FFP_CONTRACT_OFF:
     extra_compile_args.append('-ffp-contract=off')
 
 libreboundxmodule = Extension('libreboundx',
+
         sources = [ 'src/interpolation.c', 'src/modify_orbits_forces.c', 'src/input.c', 'src/steppers.c', 'src/integrator_rk4.c', 'src/gr_potential.c', 'src/exponential_migration.c', 'src/integrate_force.c', 'src/integrator_implicit_midpoint.c', 'src/modify_orbits_direct.c', 'src/inner_disk_edge.c', 'src/track_min_distance.c', 'src/tides_spin.c', 'src/output.c', 'src/gas_dynamical_friction.c', 'src/gr.c', 'src/stochastic_forces.c', 'src/modify_mass.c', 'src/gas_damping_timescale.c', 'src/type_I_migration.c', 'src/radiation_forces.c', 'src/integrator_rk2.c', 'src/gravitational_harmonics.c', 'src/linkedlist.c', 'src/roche_lobe_mass_transfer.c', 'src/core.c', 'src/gr_full.c', 'src/central_force.c', 'src/integrator_euler.c', 'src/lense_thirring.c', 'src/yarkovsky_effect.c', 'src/tides_constant_time_lag.c', 'src/rebxtools.c'],
+
                     include_dirs = ['src'],
                     library_dirs = [],
                     runtime_library_dirs = ["."],
