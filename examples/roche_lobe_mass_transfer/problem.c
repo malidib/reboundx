@@ -38,6 +38,7 @@ int main(int argc, char* argv[]){
 
     rebx_set_param_int(rebx, &rl->ap, "rlmt_donor", 1);
     rebx_set_param_int(rebx, &rl->ap, "rlmt_accretor", 0);
+    rebx_set_param_double(rebx, &rl->ap, "rlmt_loss_fraction", 0.2);
 
     rebx_set_param_double(rebx, &sim->particles[1].ap, "rlmt_Hp", 0.0005); // pressure scale height
     rebx_set_param_double(rebx, &sim->particles[1].ap, "rlmt_mdot0", 1e-5); // Msun/yr

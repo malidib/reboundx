@@ -148,6 +148,7 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "rlmt_accretor", REBX_TYPE_INT);
     rebx_register_param(rebx, "rlmt_Hp", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "rlmt_mdot0", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_loss_fraction", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
