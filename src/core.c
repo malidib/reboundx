@@ -441,6 +441,10 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
         operator->step_function = rebx_track_min_distance;
         operator->operator_type = REBX_OPERATOR_RECORDER;
     }
+    else if (strcmp(name, "gw_orbital_decay") == 0){
+        operator->step_function = rebx_gw_orbital_decay;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
     else{
         char str[300];
         sprintf(str, "REBOUNDx error: Operator '%s' not found in REBOUNDx library.\n", name);

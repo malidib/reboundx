@@ -748,3 +748,27 @@ min_distance_orbit (reb_orbit)   No          Parameter to store orbital elements
 ================================ =========== =======================================================
 
 
+
+.. _gw_orbital_decay:
+
+gw_orbital_decay
+*****************
+
+======================= ===============================================================
+Authors                 Codex
+Implementation Paper    `Peters 1964 <https://ui.adsabs.harvard.edu/abs/1964PhRv..136.1224P/abstract>`_.
+Based on                Peters (1964) orbit-averaged decay rates.
+Python Example          `GWOrbitalDecay.ipynb <https://github.com/dtamayo/reboundx/blob/master/ipython_examples/GWOrbitalDecay.ipynb>`_.
+======================= ===============================================================
+
+This operator applies gravitational wave orbital decay to the companion orbiting the primary.
+Only the first two particles (primary and companion) are evolved.
+
+**Effect Parameters**
+
+============================ =========== ========================================
+Field (C type)               Required    Description
+============================ =========== ========================================
+c (double)                   No          Speed of light (defaults to 299792458)
+============================ =========== ========================================
+
