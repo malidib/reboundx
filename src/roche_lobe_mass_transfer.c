@@ -117,6 +117,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     const double rl = r * (0.49*q13*q13) / (0.6*q13*q13 + log(1.+q13));
     const double Rd = donor->r;
 
+
     const double mdot = -mdot0 * exp((Rd - rl)/Hp); // negative for mass loss
     double dM = mdot * dt;
     if (donor->m + dM <= 0.){
@@ -136,6 +137,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
         reb_simulation_move_to_com(sim);
         return;
     }
+
 
     reb_simulation_move_to_com(sim);
 }
