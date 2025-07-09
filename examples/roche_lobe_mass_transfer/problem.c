@@ -43,6 +43,14 @@ int main(int argc, char* argv[]){
     rebx_set_param_double(rebx, &sim->particles[1].ap, "rlmt_Hp", 0.0005); // pressure scale height
     rebx_set_param_double(rebx, &sim->particles[1].ap, "rlmt_mdot0", 1e-5); // Msun/yr
 
+    // Common-envelope drag parameters
+    rebx_set_param_double(rebx, &rl->ap, "ce_rho0", 1e-6);
+    rebx_set_param_double(rebx, &rl->ap, "ce_alpha_rho", -2.0);
+    rebx_set_param_double(rebx, &rl->ap, "ce_cs", 30.0);
+    rebx_set_param_double(rebx, &rl->ap, "ce_alpha_cs", 0.0);
+    rebx_set_param_double(rebx, &rl->ap, "ce_xmin", 0.01);
+    rebx_set_param_double(rebx, &rl->ap, "ce_Qd", 1.0);
+
     double tmax = 1.0; // years
     reb_simulation_integrate(sim, tmax);
 

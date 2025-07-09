@@ -75,6 +75,22 @@
 #include "rebound.h"
 #include "reboundx.h"
 
+static double mach_piece_sub(const double mach){
+    if (mach<0.02){
+        return mach*mach*mach/3.+mach*mach*mach*mach*mach/5.;
+    }
+    return 0.5*log((1.0+mach)/(1.0-mach))-mach;
+}
+
+static double calculate_pre_factor(const double mach, const double xmin){
+    const double coul=log(1.0/xmin);
+    if (mach>=1.0){
+        return coul;
+    }else{
+        return fmin(coul, mach_piece_sub(mach));
+    }
+}
+
 void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt){
     struct rebx_extras* const rebx = sim->extras;
 
@@ -101,6 +117,13 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     const double* mdot0_ptr = rebx_get_param(rebx, donor->ap, "rlmt_mdot0");
     const double* loss_frac_ptr = rebx_get_param(rebx, operator->ap, "rlmt_loss_fraction");
 
+    const double* ce_rho0_ptr = rebx_get_param(rebx, operator->ap, "ce_rho0");
+    const double* ce_alpha_rho_ptr = rebx_get_param(rebx, operator->ap, "ce_alpha_rho");
+    const double* ce_cs_ptr = rebx_get_param(rebx, operator->ap, "ce_cs");
+    const double* ce_alpha_cs_ptr = rebx_get_param(rebx, operator->ap, "ce_alpha_cs");
+    const double* ce_xmin_ptr = rebx_get_param(rebx, operator->ap, "ce_xmin");
+    const double* ce_Qd_ptr = rebx_get_param(rebx, operator->ap, "ce_Qd");
+
     if (Hp_ptr == NULL || mdot0_ptr == NULL){
         rebx_error(rebx, "Need to set rlmt_Hp and rlmt_mdot0 on donor particle.\n");
         return;
@@ -117,6 +140,20 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     } else if (loss_frac > 1.){
         loss_frac = 1.;
     }
+
+    double ce_rho0 = 0.;
+    double ce_alpha_rho = 0.;
+    double ce_cs = 0.;
+    double ce_alpha_cs = 0.;
+    double ce_xmin = 0.;
+    double ce_Qd = 0.;
+
+    if (ce_rho0_ptr)    ce_rho0    = *ce_rho0_ptr;
+    if (ce_alpha_rho_ptr) ce_alpha_rho = *ce_alpha_rho_ptr;
+    if (ce_cs_ptr)      ce_cs      = *ce_cs_ptr;
+    if (ce_alpha_cs_ptr) ce_alpha_cs = *ce_alpha_cs_ptr;
+    if (ce_xmin_ptr)    ce_xmin    = *ce_xmin_ptr;
+    if (ce_Qd_ptr)      ce_Qd      = *ce_Qd_ptr;
 
     const double dx = donor->x - accretor->x;
     const double dy = donor->y - accretor->y;
@@ -140,6 +177,27 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
 
     donor->m -= mass_loss;
     accretor->m += mass_accreted;
+
+    if (ce_rho0 > 0. && ce_cs > 0. && r < Rd){
+        const double r_ratio = r/Rd;
+        const double rho = ce_rho0 * pow(r_ratio, ce_alpha_rho);
+        const double cs = ce_cs * pow(r_ratio, ce_alpha_cs);
+        const double vrelx = accretor->vx - donor->vx;
+        const double vrely = accretor->vy - donor->vy;
+        const double vrelz = accretor->vz - donor->vz;
+        const double vrel = sqrt(vrelx*vrelx + vrely*vrely + vrelz*vrelz);
+        if (vrel > 0.0 && rho > 0.0){
+            const double mach = vrel/cs;
+            const double I = calculate_pre_factor(mach, ce_xmin>0.?ce_xmin:1e-4);
+            double fc = 4.*M_PI*(sim->G*sim->G)*accretor->m*rho/(vrel*vrel*vrel)*I;
+            if (ce_Qd>0. && accretor->r>0.){
+                fc += M_PI*rho*accretor->r*accretor->r*vrel*ce_Qd/accretor->m;
+            }
+            accretor->vx -= fc*vrelx*dt;
+            accretor->vy -= fc*vrely*dt;
+            accretor->vz -= fc*vrelz*dt;
+        }
+    }
 
     // Stop accretion once the donor has lost all of its mass. The donor
     // particle is removed from the simulation and the operator itself is

@@ -24,6 +24,7 @@ tests/*/rebound*
 examples/*/rebound*
 doc/html/*
 doc/latex/*
+!doc/latex/common_envelope_drag.tex
 doc/Doxyfile
 MANIFEST
 reboundx.egg-info

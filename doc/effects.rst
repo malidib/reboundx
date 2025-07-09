@@ -470,6 +470,48 @@ Name (C type)                Required    Description
 tau_mass (double)            Yes         e-folding mass loss (<0) or growth (>0) timescale    
 ============================ =========== =======================================================
 
+.. _roche_lobe_mass_transfer:
+
+roche_lobe_mass_transfer
+************************
+
+======================= ================================================================
+Authors                 M. Ali-Dib
+Implementation Paper    `Ritter 1988 <https://ui.adsabs.harvard.edu/abs/1988A%26A...202...93R/abstract>`_
+Based on                `Kolb & Ritter 1990 <https://ui.adsabs.harvard.edu/abs/1990A%26A...236..385K/abstract>`_
+C Example               :ref:`c_example_roche_lobe_mass_transfer`
+Python Example          `roche_lobe_mass_transfer.py <https://github.com/dtamayo/reboundx>`_
+======================= ================================================================
+
+Transfers mass from a donor to an accretor when the donor overfills its Roche lobe.
+If the accretor lies within the donor's radius, a common-envelope drag force is applied.
+
+**Effect Parameters**
+
+============================ =========== ============================================
+Field (C type)               Required    Description
+============================ =========== ============================================
+rlmt_donor (int)             Yes         Index of donor particle
+rlmt_accretor (int)          Yes         Index of accretor particle
+rlmt_loss_fraction (double)  No          Fraction of lost mass escaping the system
+ce_rho0 (double)             No          Gas density at donor surface
+ce_alpha_rho (double)        No          Power-law slope of density profile
+ce_cs (double)               No          Sound speed at donor surface
+ce_alpha_cs (double)         No          Power-law slope of sound speed profile
+ce_xmin (double)             No          Coulomb logarithm parameter
+ce_Qd (double)               No          Geometric drag coefficient
+============================ =========== ============================================
+
+**Particle Parameters**
+
+============================ =========== ============================================
+Field (C type)               Required    Description
+============================ =========== ============================================
+rlmt_Hp (double)             Yes         Pressure scale height of the donor star
+rlmt_mdot0 (double)          Yes         Normalization of the mass transfer rate
+particles[i].r (double)      Yes         Physical radius of the donor and companion
+============================ =========== ============================================
+
 
 Tides
 ^^^^^^^^^^^^^^^^^^
