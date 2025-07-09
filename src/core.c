@@ -155,6 +155,7 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "ce_alpha_cs", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_xmin", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_Qd", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "gw_c", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
