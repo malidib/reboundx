@@ -25,6 +25,7 @@ examples/*/rebound*
 doc/html/*
 doc/latex/*
 !doc/latex/common_envelope_drag.tex
+!doc/latex/gravitational_wave_decay.tex
 doc/Doxyfile
 MANIFEST
 reboundx.egg-info

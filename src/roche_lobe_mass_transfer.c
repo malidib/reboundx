@@ -123,6 +123,8 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     const double* ce_alpha_cs_ptr = rebx_get_param(rebx, operator->ap, "ce_alpha_cs");
     const double* ce_xmin_ptr = rebx_get_param(rebx, operator->ap, "ce_xmin");
     const double* ce_Qd_ptr = rebx_get_param(rebx, operator->ap, "ce_Qd");
+    const double* gw_c_ptr = rebx_get_param(rebx, operator->ap, "gw_c");
+    const int* gw_decay_on_ptr = rebx_get_param(rebx, operator->ap, "gw_decay_on");
 
     if (Hp_ptr == NULL || mdot0_ptr == NULL){
         rebx_error(rebx, "Need to set rlmt_Hp and rlmt_mdot0 on donor particle.\n");
@@ -196,6 +198,32 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
             accretor->vx -= fc*vrelx*dt;
             accretor->vy -= fc*vrely*dt;
             accretor->vz -= fc*vrelz*dt;
+        }
+    }
+
+    if (gw_c_ptr != NULL && *gw_c_ptr > 0. && gw_decay_on_ptr != NULL && *gw_decay_on_ptr != 0){
+        struct reb_orbit o = reb_orbit_from_particle(sim->G, *donor, *accretor);
+        if (o.a > 0.){
+            const double c = *gw_c_ptr;
+            const double m1 = donor->m;
+            const double m2 = accretor->m;
+            const double G3 = sim->G*sim->G*sim->G;
+            const double e = o.e;
+            const double a = o.a;
+            const double fac_a = -64./5. * G3*m1*m2*(m1+m2)/(pow(c,5)*pow(a,3)*pow(1.-e*e,3.5))*(1.+73./24.*e*e+37./96.*e*e*e*e);
+            const double fac_e = -304./15. * e * G3*m1*m2*(m1+m2)/(pow(c,5)*pow(a,4)*pow(1.-e*e,2.5))*(1.+121./304.*e*e);
+            double new_a = a + fac_a*dt;
+            double new_e = e + fac_e*dt;
+            if (new_a < 0.) new_a = 0.;
+            if (new_e < 0.) new_e = 0.;
+            if (new_e > 0.999999) new_e = 0.999999;
+            struct reb_particle np = reb_particle_from_orbit(sim->G, *accretor, m1, new_a, new_e, o.inc, o.Omega, o.omega, o.f);
+            donor->x = np.x;
+            donor->y = np.y;
+            donor->z = np.z;
+            donor->vx = np.vx;
+            donor->vy = np.vy;
+            donor->vz = np.vz;
         }
     }
 
