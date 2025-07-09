@@ -480,10 +480,11 @@ Authors                 M. Ali-Dib
 Implementation Paper    `Ritter 1988 <https://ui.adsabs.harvard.edu/abs/1988A%26A...202...93R/abstract>`_
 Based on                `Kolb & Ritter 1990 <https://ui.adsabs.harvard.edu/abs/1990A%26A...236..385K/abstract>`_
 C Example               :ref:`c_example_roche_lobe_mass_transfer`
-Python Example          `roche_lobe_mass_transfer.py <https://github.com/dtamayo/reboundx>`_
+Python Example          `roche_lobe_mass_transfer.py <https://github.com/dtamayo/reboundx>`_, `rlmt_gw_orbital_decay.py <https://github.com/dtamayo/reboundx>`_
 ======================= ================================================================
 
 Transfers mass from a donor to an accretor when the donor overfills its Roche lobe.
+If ``gw_c`` is provided, gravitational wave orbital decay is included using the 2.5PN Peters (1964) prescription.
 If the accretor lies within the donor's radius, a common-envelope drag force is applied.
 
 **Effect Parameters**
@@ -500,6 +501,7 @@ ce_cs (double)               No          Sound speed at donor surface
 ce_alpha_cs (double)         No          Power-law slope of sound speed profile
 ce_xmin (double)             No          Coulomb logarithm parameter
 ce_Qd (double)               No          Geometric drag coefficient
+gw_c (double)                No          Speed of light for gravitational wave decay
 ============================ =========== ============================================
 
 **Particle Parameters**
