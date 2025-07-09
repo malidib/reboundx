@@ -126,6 +126,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     const double* gw_c_ptr = rebx_get_param(rebx, operator->ap, "gw_c");
     const int* gw_decay_on_ptr = rebx_get_param(rebx, operator->ap, "gw_decay_on");
 
+
     if (Hp_ptr == NULL || mdot0_ptr == NULL){
         rebx_error(rebx, "Need to set rlmt_Hp and rlmt_mdot0 on donor particle.\n");
         return;
@@ -202,6 +203,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
     }
 
     if (gw_c_ptr != NULL && *gw_c_ptr > 0. && gw_decay_on_ptr != NULL && *gw_decay_on_ptr != 0){
+
         struct reb_orbit o = reb_orbit_from_particle(sim->G, *donor, *accretor);
         if (o.a > 0.){
             const double c = *gw_c_ptr;

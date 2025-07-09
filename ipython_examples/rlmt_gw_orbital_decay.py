@@ -21,6 +21,7 @@ sim.particles[1].params['rlmt_mdot0'] = 1e-9
 rl.params['gw_c'] = 63239.7263  # speed of light in AU/yr
 rl.params["gw_decay_on"] = 1
 
+
 for i in range(5):
     sim.integrate(sim.t+0.1)
     o = sim.particles[1].orbit(primary=sim.particles[0])
