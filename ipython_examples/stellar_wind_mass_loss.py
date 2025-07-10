@@ -14,6 +14,6 @@ sim.particles[0].params['swml_eta'] = 0.5
 sim.particles[0].params['swml_R'] = 1.0
 sim.particles[0].params['swml_L'] = 1.0
 
-for i in range(5):
+for i in range(500):
     sim.integrate(sim.t+2e4)
     print(f"t={sim.t:.1f} yr, M={sim.particles[0].m:.6f} Msun")
