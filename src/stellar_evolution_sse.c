@@ -39,10 +39,16 @@
  * ============================ =========== ====================================
  * Field (C type)               Required    Description
  * ============================ =========== ====================================
- * sse_Msun (double)            No          Solar mass in code units (default 1)
  * sse_Rsun (double)            No          Solar radius in code units (default 1)
  * sse_Lsun (double)            No          Solar luminosity in code units (default 1)
+ * sse_R_coeff (double)        No          Multiplicative factor for radius scaling (default 1)
+ * sse_R_exp (double)          No          Mass exponent for radius scaling (default 0.8)
+ * sse_L_coeff (double)        No          Multiplicative factor for luminosity scaling (default 1)
+ * sse_L_exp (double)          No          Mass exponent for luminosity scaling (default 3.5)
  * ============================ =========== ====================================
+ *
+ * The stellar mass is read directly from the particle's ``m`` field and is
+ * assumed to be expressed in solar masses.
  */
 
 #include <stdio.h>
@@ -55,15 +61,25 @@ void rebx_stellar_evolution_sse(struct reb_simulation* const sim, struct rebx_op
     struct rebx_extras* const rebx = sim->extras;
     const int N_real = sim->N - sim->N_var;
 
-    double Msun = 1.;
     double Rsun = 1.;
     double Lsun = 1.;
-    const double* Msun_ptr = rebx_get_param(rebx, operator->ap, "sse_Msun");
+    double R_coeff = 1.;
+    double R_exp = 0.8;
+    double L_coeff = 1.;
+    double L_exp = 3.5;
+
     const double* Rsun_ptr = rebx_get_param(rebx, operator->ap, "sse_Rsun");
     const double* Lsun_ptr = rebx_get_param(rebx, operator->ap, "sse_Lsun");
-    if (Msun_ptr) Msun = *Msun_ptr;
+    const double* R_coeff_ptr  = rebx_get_param(rebx, operator->ap, "sse_R_coeff");
+    const double* R_exp_ptr    = rebx_get_param(rebx, operator->ap, "sse_R_exp");
+    const double* L_coeff_ptr  = rebx_get_param(rebx, operator->ap, "sse_L_coeff");
+    const double* L_exp_ptr    = rebx_get_param(rebx, operator->ap, "sse_L_exp");
     if (Rsun_ptr) Rsun = *Rsun_ptr;
     if (Lsun_ptr) Lsun = *Lsun_ptr;
+    if (R_coeff_ptr) R_coeff = *R_coeff_ptr;
+    if (R_exp_ptr)   R_exp   = *R_exp_ptr;
+    if (L_coeff_ptr) L_coeff = *L_coeff_ptr;
+    if (L_exp_ptr)   L_exp   = *L_exp_ptr;
 
     for (int i=0; i<N_real; i++){
         struct reb_particle* const p = &sim->particles[i];
@@ -71,15 +87,18 @@ void rebx_stellar_evolution_sse(struct reb_simulation* const sim, struct rebx_op
         if (age_ptr == NULL){
             continue;
         }
+
         *age_ptr += dt;
-        const double mass_ratio = p->m / Msun;
-        const double tms = 1e10 * pow(mass_ratio, -2.5); // yrs in code units
+        const double mass_ratio = p->m; // assume simulation masses are in M_sun
+        const double Rzams = R_coeff * Rsun * pow(mass_ratio, R_exp);
+        const double Lzams = L_coeff * Lsun * pow(mass_ratio, L_exp);
+
+        const double tms = 1e10 * pow(mass_ratio, -2.5); // yrs
         double tau = *age_ptr / tms;
         if (tau > 1.) tau = 1.;
-        const double Rzams = Rsun * pow(mass_ratio, 0.8);
-        const double Lzams = Lsun * pow(mass_ratio, 3.5);
-        const double R = Rzams * (1. + 5.*tau);
-        const double L = Lzams * (1. + 10.*tau);
+        double R = Rzams * (1. + 5.*tau);
+        double L = Lzams * (1. + 10.*tau);
+
         p->r = R;
         rebx_set_param_double(rebx, &p->ap, "swml_R", R);
         rebx_set_param_double(rebx, &p->ap, "swml_L", L);

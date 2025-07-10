@@ -579,10 +579,16 @@ single-star evolution relations.  Tracks a particle's age via the
 ============================ =========== ======================================
 Field (C type)               Required    Description
 ============================ =========== ======================================
-sse_Msun (double)            No          Solar mass in code units
 sse_Rsun (double)            No          Solar radius in code units
 sse_Lsun (double)            No          Solar luminosity in code units
+sse_R_coeff (double)        No          Multiplicative factor for R(M) scaling
+sse_R_exp (double)          No          Mass exponent for R(M) scaling
+sse_L_coeff (double)        No          Multiplicative factor for L(M) scaling
+sse_L_exp (double)          No          Mass exponent for L(M) scaling
 ============================ =========== ======================================
+
+The star's mass is read directly from its ``m`` value in the simulation and
+should be expressed in solar masses.
 
 **Particle Parameters**
 
