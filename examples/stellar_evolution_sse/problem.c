@@ -2,7 +2,7 @@
  * Stellar Evolution SSE Example
  *
  * Demonstrates the simplified stellar_evolution_sse operator that updates
- * a star's radius and luminosity with age.
+ * a star's radius and luminosity based on its mass.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +28,6 @@ int main(int argc, char* argv[]){
     struct rebx_operator* sse = rebx_load_operator(rebx, "stellar_evolution_sse");
     rebx_add_operator(rebx, sse);
 
-    rebx_set_param_double(rebx, &sim->particles[0].ap, "sse_age", 0.0);
 
     for(int i=0;i<10;i++){
         reb_simulation_integrate(sim, (i+1)*tmax/10.);

@@ -164,10 +164,12 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "swml_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Lsun", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "sse_age", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "sse_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Lsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_R_coeff", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_R_exp", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_L_coeff", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_L_exp", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
