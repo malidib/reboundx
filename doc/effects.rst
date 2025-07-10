@@ -570,9 +570,10 @@ C Example               :ref:`c_example_stellar_evolution_sse`
 Python Example          `stellar_evolution_sse.py <https://github.com/dtamayo/reboundx>`_
 ======================= ===============================================
 
-Updates stellar radius and luminosity according to simplified analytic
-single-star evolution relations.  Tracks a particle's age via the
-``sse_age`` parameter and updates ``swml_R`` and ``swml_L`` accordingly.
+Updates stellar radius and luminosity using simplified analytic
+mass--radius and mass--luminosity relations.  The operator stores the
+resulting values in ``swml_R`` and ``swml_L`` so other effects (e.g.,
+stellar winds) can access them.
 
 **Effect Parameters**
 
@@ -590,13 +591,6 @@ sse_L_exp (double)          No          Mass exponent for L(M) scaling
 The star's mass is read directly from its ``m`` value in the simulation and
 should be expressed in solar masses.
 
-**Particle Parameters**
-
-============================ =========== ======================================
-Field (C type)               Required    Description
-============================ =========== ======================================
-sse_age (double)             Yes         Stellar age
-============================ =========== ======================================
 
 
 Tides

@@ -164,7 +164,6 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "swml_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Lsun", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "sse_age", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Lsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_R_coeff", REBX_TYPE_DOUBLE);
