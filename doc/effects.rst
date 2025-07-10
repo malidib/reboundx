@@ -592,6 +592,7 @@ The star's mass is read directly from its ``m`` value in the simulation and
 should be expressed in solar masses.
 
 
+
 Tides
 ^^^^^^^^^^^^^^^^^^
 

@@ -9,7 +9,7 @@
  *
  * The zero-age main sequence radius and luminosity scale approximately as
  *
- * .. math::
+ * 
  *    R \propto (M/M_\odot)^{0.8},\qquad
  *    L \propto (M/M_\odot)^{3.5}.
  *
@@ -60,11 +60,9 @@ void rebx_stellar_evolution_sse(struct reb_simulation* const sim, struct rebx_op
 
     for (int i=0; i<N_real; i++){
         struct reb_particle* const p = &sim->particles[i];
-
-        const double mass_ratio = p->m; // assume simulation masses are in M_sun
+        const double mass_ratio = p->m; 
         double R = R_coeff * Rsun * pow(mass_ratio, R_exp);
         double L = L_coeff * Lsun * pow(mass_ratio, L_exp);
-
         p->r = R;
         rebx_set_param_double(rebx, &p->ap, "swml_R", R);
         rebx_set_param_double(rebx, &p->ap, "swml_L", L);

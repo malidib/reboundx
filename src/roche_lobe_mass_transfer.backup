@@ -1,36 +1,25 @@
 /**
  * @file    roche_lobe_mass_transfer.c
- * @brief   Binary‑star sink operator: Roche‑lobe overflow (RLOF),
- *          non‑conservative mass loss, common‑envelope drag,
- *          and gravitational‑wave decay – **momentum‑ & angular‑momentum
- *          conserving version**.
+ * @brief   Binary‑star sink operator: Roche‑lobe overflow, systemic
+ *          mass loss, common‑envelope drag, gravitational‑wave decay,
+ *          plus automatic object removal & merging.
  *
- * Implements
- *   1. Ritter‑type RLOF (Ritter 1988; Kolb & Ritter 1990) with optional
- *      donor mass–radius evolution.
- *   2. Optional systemic mass loss (parameter *rlmt_loss_fraction*).
- *   3. Chandrasekhar / Ostriker dynamical friction inside a common envelope
- *      (Ostriker 1999 – optional) with a safety cap on the kick magnitude.
- *   4. Peters (1964) gravitational‑wave back‑reaction (optional).
+ * Last update: 2025‑07‑10
  *
- * New in this version
- *   • **Exact conservation of total *angular* momentum** during RLOF if the
- *     stream is assumed to carry the donor’s specific orbital AM.
- *   • **Safety cap** on CE‑drag kicks (parameter *ce_max_kick_fraction*).
- *   • **Donor radius** can follow a power‑law R(M) relation
- *     (parameters *rlmt_R_slope*, *rlmt_R_ref_mass*, *rlmt_R_ref_radius*).
- *
- * The file can simply replace
- *   `roche_lobe_mass_transfer.c` in REBOUNDx ≥ v3.3.
+ * New in this revision
+ *   • Any particle whose mass becomes ≤ 0 is removed immediately.
+ *   • Donor and accretor are **merged** when their separation drops
+ *     below *merge_eps* (parameter, default = 1 cm).
  */
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <float.h>
 #include <math.h>
 #include "rebound.h"
 #include "reboundx.h"
 
-/* ---------- tiny helpers --------------------------------------------------- */
+/* ---------- vector helpers ------------------------------------------------- */
 static inline void cross3(const double ax, const double ay, const double az,
                           const double bx, const double by, const double bz,
                           double* const rx, double* const ry, double* const rz){
@@ -39,394 +28,277 @@ static inline void cross3(const double ax, const double ay, const double az,
     *rz = ax*by - ay*bx;
 }
 
-static inline double dot3(const double ax, const double ay, const double az,
-                          const double bx, const double by, const double bz){
-    return ax*bx + ay*by + az*bz;
-}
-
-/* ---------- helper for Ostriker drag prefactor ----------------------------- */
-static double mach_piece_sub(const double mach){
-    /* Integral I(M) for sub‑sonic Mach numbers (Ostriker 1999, Eq. 13).   */
-    /* Series truncated at O(M⁵).                                          */
-    if (mach < 0.02){
-        const double m2 = mach*mach;
-        return  m2*mach/3.        /* ⅓ M³  */
-              + m2*m2*mach/5.;    /* ⅕ M⁵  */
+/* ---------- Ostriker drag helper ------------------------------------------- */
+static double mach_piece_sub(const double M){
+    if (M < 0.02){
+        const double m2 = M*M;
+        return  m2*M/3. + m2*m2*M/5.;                /* ⅓ M³ + ⅕ M⁵          */
     }
-    return 0.5*log((1.+mach)/(1.-mach)) - mach;   /* analytic form for M<1   */
+    return 0.5*log((1.+M)/(1.-M)) - M;               /* analytic M<1         */
 }
-
-static double calculate_pre_factor(const double mach, const double xmin){
-    /* Coulomb‑logarithm–like term (I) valid for all Mach numbers.         */
+static double I_prefactor(const double M, const double xmin){
     const double coul = log(1./xmin);
-    if (mach > 1.0){                /* supersonic: classical Chandrasekhar   */
-        return coul;
-    }
-    return fmin(coul, mach_piece_sub(mach));  /* sub‑sonic: Ostriker (1999)  */
+    if (M > 1.0)   return coul;                      /* supersonic           */
+    return fmin(coul, mach_piece_sub(M));            /* sub‑sonic            */
 }
 
 /* ========================================================================== */
 void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
-                                   struct rebx_operator*     const operator,
+                                   struct rebx_operator*     const op,
                                    const double                     dt)
 {
     struct rebx_extras* const rebx = sim->extras;
 
-    /* --------  indices of donor / accretor  ------------------------------- */
-    int* donor_idx_ptr     = rebx_get_param(rebx, operator->ap, "rlmt_donor");
-    int* accretor_idx_ptr  = rebx_get_param(rebx, operator->ap, "rlmt_accretor");
-
+    /* indices of donor / accretor */
+    int* donor_idx_ptr     = rebx_get_param(rebx, op->ap, "rlmt_donor");
+    int* accretor_idx_ptr  = rebx_get_param(rebx, op->ap, "rlmt_accretor");
     if (!donor_idx_ptr || !accretor_idx_ptr){
-        rebx_error(rebx, "Need to set rlmt_donor and rlmt_accretor.\n");
-        return;
+        rebx_error(rebx,"Need to set rlmt_donor / rlmt_accretor.");  return;
     }
-    const int donor_idx    = *donor_idx_ptr;
-    const int accretor_idx = *accretor_idx_ptr;
-
-    if (donor_idx >= sim->N || accretor_idx >= sim->N ||
-        donor_idx < 0      || accretor_idx < 0){
-        rebx_error(rebx, "rlmt_donor or rlmt_accretor index out of range.\n");
-        return;
+    int donor_idx    = *donor_idx_ptr;
+    int accretor_idx = *accretor_idx_ptr;
+    if (donor_idx>=sim->N || accretor_idx>=sim->N ||
+        donor_idx<0     || accretor_idx<0){
+        rebx_error(rebx,"rlmt_donor / rlmt_accretor out of range."); return;
     }
 
-    struct reb_particle* donor     = &sim->particles[donor_idx];
-    struct reb_particle* accretor  = &sim->particles[accretor_idx];
+    struct reb_particle* d = &sim->particles[donor_idx];
+    struct reb_particle* a = &sim->particles[accretor_idx];
 
-    /* --------  effect‑specific parameters  -------------------------------- */
-    const double* Hp_ptr         = rebx_get_param(rebx, donor->ap,     "rlmt_Hp");
-    const double* mdot0_ptr      = rebx_get_param(rebx, donor->ap,     "rlmt_mdot0");
-    const double* loss_frac_ptr  = rebx_get_param(rebx, operator->ap,  "rlmt_loss_fraction");
-
-    /* Donor mass‑radius evolution (optional) */
-    const double* R_slope_ptr    = rebx_get_param(rebx, donor->ap,     "rlmt_R_slope");
-    const double* R_refM_ptr     = rebx_get_param(rebx, donor->ap,     "rlmt_R_ref_mass");
-    const double* R_refR_ptr     = rebx_get_param(rebx, donor->ap,     "rlmt_R_ref_radius");
-
-    /* Common‑envelope parameters (optional) */
-    const double* ce_rho0_ptr    = rebx_get_param(rebx, operator->ap,  "ce_rho0");
-    const double* ce_alpha_rho_ptr = rebx_get_param(rebx, operator->ap,"ce_alpha_rho");
-    const double* ce_cs_ptr      = rebx_get_param(rebx, operator->ap,  "ce_cs");
-    const double* ce_alpha_cs_ptr= rebx_get_param(rebx, operator->ap,  "ce_alpha_cs");
-    const double* ce_xmin_ptr    = rebx_get_param(rebx, operator->ap,  "ce_xmin");
-    const double* ce_Qd_ptr      = rebx_get_param(rebx, operator->ap,  "ce_Qd");
-    const double* ce_kick_frac_ptr = rebx_get_param(rebx, operator->ap,"ce_max_kick_fraction");
-
-    /* Gravitational‑wave parameters (optional) */
-    const double* gw_c_ptr       = rebx_get_param(rebx, operator->ap,  "gw_c");
-    const int*    gw_on_ptr      = rebx_get_param(rebx, operator->ap,  "gw_decay_on");
-
+    /* parameters ----------------------------------------------------------- */
+    const double *Hp_ptr = rebx_get_param(rebx, d->ap, "rlmt_Hp");
+    const double *mdot0_ptr = rebx_get_param(rebx, d->ap, "rlmt_mdot0");
     if (!Hp_ptr || !mdot0_ptr){
-        rebx_error(rebx, "Need to set rlmt_Hp and rlmt_mdot0 on donor particle.\n");
-        return;
+        rebx_error(rebx,"Set rlmt_Hp and rlmt_mdot0 on donor."); return;
     }
+    const double *loss_ptr =
+        rebx_get_param(rebx, op->ap, "rlmt_loss_fraction");
+    const double *R_slope_ptr =
+        rebx_get_param(rebx, d->ap, "rlmt_R_slope");
+    const double *R_refM_ptr =
+        rebx_get_param(rebx, d->ap, "rlmt_R_ref_mass");
+    const double *R_refR_ptr =
+        rebx_get_param(rebx, d->ap, "rlmt_R_ref_radius");
+    /* CE parameters */
+    const double *rho0_ptr  = rebx_get_param(rebx, op->ap, "ce_rho0");
+    const double *arho_ptr  = rebx_get_param(rebx, op->ap, "ce_alpha_rho");
+    const double *cs_ptr    = rebx_get_param(rebx, op->ap, "ce_cs");
+    const double *acs_ptr   = rebx_get_param(rebx, op->ap, "ce_alpha_cs");
+    const double *xmin_ptr  = rebx_get_param(rebx, op->ap, "ce_xmin");
+    const double *Qd_ptr    = rebx_get_param(rebx, op->ap, "ce_Qd");
+    const double *kick_ptr  = rebx_get_param(rebx, op->ap, "ce_max_kick_fraction");
+    /* GW parameters */
+    const double *c_ptr     = rebx_get_param(rebx, op->ap,"gw_c");
+    const int    *gw_on_ptr = rebx_get_param(rebx, op->ap,"gw_decay_on");
+    /* merge distance parameter (optional) */
+    const double *merge_eps_ptr = rebx_get_param(rebx, op->ap, "merge_eps");
 
-    /* --------------------- physical constants & shortcuts ----------------- */
-    const double Hp      = *Hp_ptr;
-    const double mdot0   = *mdot0_ptr;
+    /* convenient scalars */
+    const double Hp     = *Hp_ptr;
+    const double mdot0  = *mdot0_ptr;
+    double loss_frac    =  loss_ptr ? *loss_ptr : 0.0;
+    if (loss_frac<0) loss_frac=0; else if (loss_frac>1) loss_frac=1;
 
-    /* Clamp loss fraction to [0,1] */
-    double loss_frac = (loss_frac_ptr ? *loss_frac_ptr : 0.);
-    if (loss_frac < 0.)      loss_frac = 0.;
-    else if (loss_frac > 1.) loss_frac = 1.;
-
-    /* Donor R(M) parameters */
-    const double R_slope =  (R_slope_ptr  ? *R_slope_ptr  : 0.0);
-    const double R_refM  =  (R_refM_ptr   ? *R_refM_ptr   : 1.0); /* avoid ÷0 */
-    const double R_refR  =  (R_refR_ptr   ? *R_refR_ptr   : donor->r);
-
-    /* Common‑envelope parameters */
-    const double ce_rho0      = ce_rho0_ptr      ? *ce_rho0_ptr     : 0.;
-    const double ce_alpha_rho = ce_alpha_rho_ptr ? *ce_alpha_rho_ptr: 0.;
-    const double ce_cs        = ce_cs_ptr        ? *ce_cs_ptr       : 0.;
-    const double ce_alpha_cs  = ce_alpha_cs_ptr  ? *ce_alpha_cs_ptr : 0.;
-    const double ce_xmin      = ce_xmin_ptr      ? *ce_xmin_ptr     : 0.;
-    const double ce_Qd        = ce_Qd_ptr        ? *ce_Qd_ptr       : 0.;
-    const double ce_kick_frac = ce_kick_frac_ptr ? *ce_kick_frac_ptr: 0.3; /* default */
-
-    /* ----------------------------------------------------------------------
-     *  STEP 1 :  Roche‑lobe overflow mass transfer
-     * ------------------------------------------------------------------- */
-
-    /* 1.1 separation of the components */
-    const double dx = donor->x - accretor->x;
-    const double dy = donor->y - accretor->y;
-    const double dz = donor->z - accretor->z;
+    /* ------------------------------------------------------------------ */
+    /*  STEP 1  –  Roche‑lobe overflow (with AM correction, donor R(M))   */
+    /* ------------------------------------------------------------------ */
+    /* separation */
+    const double dx = d->x - a->x;
+    const double dy = d->y - a->y;
+    const double dz = d->z - a->z;
     const double r  = sqrt(dx*dx + dy*dy + dz*dz);
 
-    /* 1.2 Roche‑lobe radius (Eggleton 1983) */
-    const double q        = donor->m / accretor->m;
-    const double q13      = cbrt(q);
-    const double rl       = r * (0.49*q13*q13) / (0.6*q13*q13 + log(1.+q13));
+    /* Eggleton Roche radius */
+    const double q     = d->m / a->m;
+    const double q13   = cbrt(q);
+    const double RL    = r * (0.49*q13*q13) / (0.6*q13*q13 + log(1.+q13));
 
-    /* 1.3 Ritter (1988) mass‑loss rate */
-    const double Rd_old   = donor->r;         /* donor radius before this step */
-    const double mdot     = -mdot0 * exp((Rd_old - rl)/Hp);      /* <0 for loss */
-    double       dM       = mdot * dt;        /* negative value */
+    /* Ritter exponential rate */
+    const double Rd0   = d->r;
+    double mdot        = -mdot0 * exp((Rd0-RL)/Hp);    /* <0 for loss */
+    double dM          = mdot*dt;                      /* donor Δm (<0) */
 
-    /* Prevent donor from becoming negative mass in one shot */
-    if (donor->m + dM <= 0.){
-        dM = -donor->m;
-    }
-    const double mass_loss      = -dM;                     /* positive scalar */
-    const double mass_accreted  = mass_loss * (1. - loss_frac);
-    const double mass_ejected   = mass_loss * loss_frac;
+    if (d->m + dM <= 0.)    dM = -d->m;               /* avoid neg mass */
+    const double m_loss = -dM;                        /* positive */
+    const double m_acc  = m_loss*(1.-loss_frac);
 
-    /* 1.4 Linear‑momentum bookkeeping ------------------------------------ */
-    /* velocities *before* any mass change */
-    const double vdx0 = donor->vx;
-    const double vdy0 = donor->vy;
-    const double vdz0 = donor->vz;
-    const double vax0 = accretor->vx;
-    const double vay0 = accretor->vy;
-    const double vaz0 = accretor->vz;
+    /* masses after transfer */
+    const double Md0 = d->m,  Ma0 = a->m;
+    d->m -= m_loss;  a->m += m_acc;
+    const double Md1 = d->m,  Ma1 = a->m;
 
-    const double Md0   = donor->m;
-    const double Ma0   = accretor->m;
+    /* linear momentum: accreted gas arrives with donor velocity */
+    const double px_a = Ma0*a->vx + m_acc*d->vx;
+    const double py_a = Ma0*a->vy + m_acc*d->vy;
+    const double pz_a = Ma0*a->vz + m_acc*d->vz;
+    a->vx = px_a/Ma1;  a->vy=py_a/Ma1;  a->vz=pz_a/Ma1;
 
-    /* ---- update masses ---- */
-    donor->m    -= mass_loss;
-    accretor->m += mass_accreted;
-    const double Md1 = donor->m;
-    const double Ma1 = accretor->m;
+    /* angular‑momentum correction (same as previous version) */
+    double Rcmx = (Md1*d->x + Ma1*a->x)/(Md1+Ma1);
+    double Rcmy = (Md1*d->y + Ma1*a->y)/(Md1+Ma1);
+    double Rcmz = (Md1*d->z + Ma1*a->z)/(Md1+Ma1);
 
-    /* ---- first: conserve *linear* momentum exactly ---- */
-    const double px_a = Ma0 * vax0 + mass_accreted * vdx0;
-    const double py_a = Ma0 * vay0 + mass_accreted * vdy0;
-    const double pz_a = Ma0 * vaz0 + mass_accreted * vdz0;
+    double rx_d=d->x-Rcmx, ry_d=d->y-Rcmy, rz_d=d->z-Rcmz;
+    double rx_a=a->x-Rcmx, ry_a=a->y-Rcmy, rz_a=a->z-Rcmz;
 
-    accretor->vx = px_a / Ma1;
-    accretor->vy = py_a / Ma1;
-    accretor->vz = pz_a / Ma1;
-    /* donor velocity unchanged (mass subtracted at same v) */
+    double Lcorr_x,Lcorr_y,Lcorr_z;
+    cross3(rx_d,ry_d,rz_d, d->vx,d->vy,d->vz, &Lcorr_x,&Lcorr_y,&Lcorr_z);
+    Lcorr_x*=m_acc; Lcorr_y*=m_acc; Lcorr_z*=m_acc;
 
-    /* 1.5 --- angular‑momentum correction  --------------------------------
-     *
-     * The stream carries the donor’s specific orbital AM j_stream = r_d×v_d
-     * but we injected its linear momentum at the accretor’s position,
-     * r_a.  The difference ΔL = m_acc (r_d−r_a)×v_d must be restored.
-     *
-     * We add a small tangential kick Δv_L to the accretor (and the opposite
-     * to the donor) such that
-     *          r_a × (Ma1 Δv_L) =  ΔL           (to first order)
-     * This preserves *linear* momentum when both bodies receive opposite
-     * kicks and exactly restores the missing orbital AM when
-     * ΔL·r_a ≈ 0  (which is true for circular orbits and still excellent
-     * in mildly eccentric systems).                                      */
-    /* --- barycentre (with updated masses!) --- */
-    const double Mtot1 = Md1 + Ma1;
-    const double Rcmx1 = (Md1*donor->x  + Ma1*accretor->x) / Mtot1;
-    const double Rcmy1 = (Md1*donor->y  + Ma1*accretor->y) / Mtot1;
-    const double Rcmz1 = (Md1*donor->z  + Ma1*accretor->z) / Mtot1;
+    double Linj_x,Linj_y,Linj_z;
+    cross3(rx_a,ry_a,rz_a, d->vx,d->vy,d->vz, &Linj_x,&Linj_y,&Linj_z);
+    Linj_x*=m_acc;  Linj_y*=m_acc; Linj_z*=m_acc;
 
-    /* r‑vectors from CM (after mass change but before kick) */
-    const double rx_d = donor->x   - Rcmx1;
-    const double ry_d = donor->y   - Rcmy1;
-    const double rz_d = donor->z   - Rcmz1;
+    double dLx=Lcorr_x-Linj_x, dLy=Lcorr_y-Linj_y, dLz=Lcorr_z-Linj_z;
+    double r2_a = rx_a*rx_a+ry_a*ry_a+rz_a*rz_a;
+    double dL2  = dLx*dLx+dLy*dLy+dLz*dLz;
 
-    const double rx_a = accretor->x - Rcmx1;
-    const double ry_a = accretor->y - Rcmy1;
-    const double rz_a = accretor->z - Rcmz1;
-
-    /* ΔL that still needs to be added to system (vector form) */
-    double Lcorr_x, Lcorr_y, Lcorr_z;
-    cross3((rx_d), (ry_d), (rz_d),
-           vdx0, vdy0, vdz0,
-           &Lcorr_x, &Lcorr_y, &Lcorr_z);
-    const double fac_mass = mass_accreted;
-    Lcorr_x *= fac_mass;
-    Lcorr_y *= fac_mass;
-    Lcorr_z *= fac_mass;
-
-    /* Subtract the angular momentum that *was* already injected
-     * at r_a × (m_acc v_d)                                          */
-    double Linj_x, Linj_y, Linj_z;
-    cross3((rx_a), (ry_a), (rz_a),
-           vdx0, vdy0, vdz0,
-           &Linj_x, &Linj_y, &Linj_z);
-    Linj_x *= fac_mass;
-    Linj_y *= fac_mass;
-    Linj_z *= fac_mass;
-
-    const double dLx = Lcorr_x - Linj_x;
-    const double dLy = Lcorr_y - Linj_y;
-    const double dLz = Lcorr_z - Linj_z;
-
-    /* If |ΔL| is non‑negligible, compute Δv_L for accretor */
-    const double r_a_sq = rx_a*rx_a + ry_a*ry_a + rz_a*rz_a;
-    const double dL_mag_sq = dLx*dLx + dLy*dLy + dLz*dLz;
-
-    if (dL_mag_sq > 0.){
-        /* Δv_L = (ΔL × r_a)/(Ma1 |r_a|²)   (purely tangential component) */
-        double tmpx, tmpy, tmpz;
-        cross3(dLx, dLy, dLz,
-               rx_a, ry_a, rz_a,
-               &tmpx, &tmpy, &tmpz);
-
-        const double inv = 1.0 / (Ma1 * r_a_sq + 1e-99);
-        const double dvx_L = tmpx * inv;
-        const double dvy_L = tmpy * inv;
-        const double dvz_L = tmpz * inv;
-
-        /* Apply opposite kicks to conserve *linear* momentum */
-        accretor->vx += dvx_L;
-        accretor->vy += dvy_L;
-        accretor->vz += dvz_L;
-
-        donor->vx   -= dvx_L * (Ma1 / Md1);
-        donor->vy   -= dvy_L * (Ma1 / Md1);
-        donor->vz   -= dvz_L * (Ma1 / Md1);
+    if (dL2>0 && r2_a>0){
+        double tmpx,tmpy,tmpz;
+        cross3(dLx,dLy,dLz, rx_a,ry_a,rz_a, &tmpx,&tmpy,&tmpz);
+        double inv = 1./(Ma1*r2_a);
+        double dvx=tmpx*inv, dvy=tmpy*inv, dvz=tmpz*inv;
+        a->vx+=dvx; a->vy+=dvy; a->vz+=dvz;
+        d->vx-=dvx*(Ma1/Md1); d->vy-=dvy*(Ma1/Md1); d->vz-=dvz*(Ma1/Md1);
     }
 
-    /* 1.6 --- donor radius update, if desired ----------------------------- */
-    if (R_slope != 0.){
-        const double rd_new = R_refR * pow(donor->m / R_refM, R_slope);
-        if (rd_new > 0.){
-            donor->r = rd_new;
-        }
+    /* donor R(M) update if desired */
+    if (R_slope_ptr && *R_slope_ptr!=0.0){
+        const double alpha=*R_slope_ptr;
+        const double Mref = R_refM_ptr?*R_refM_ptr:Md0;
+        const double Rref = R_refR_ptr?*R_refR_ptr:Rd0;
+        d->r = Rref*pow(d->m/Mref,alpha);
     }
-    const double Rd = donor->r;   /* (possibly updated) */
+    const double Rd = d->r;
 
-    /* ----------------------------------------------------------------------
-     *  STEP 2 :  Common‑envelope dynamical friction (optional)
-     * ------------------------------------------------------------------- */
-    if (ce_rho0 > 0. && ce_cs > 0. && r < Rd){
-        /* local envelope stratification */
-        const double r_ratio = r / Rd;
-        const double rho     = ce_rho0 * pow(r_ratio, ce_alpha_rho);
-        const double cs      = ce_cs   * pow(r_ratio, ce_alpha_cs);
+    /* ------------------------------------------------------------------ */
+    /*  STEP 2 – Common‑envelope drag (unchanged except kick cap)         */
+    /* ------------------------------------------------------------------ */
+    if (rho0_ptr && cs_ptr && r<Rd){
+        double rho0=*rho0_ptr, arho=arho_ptr?*arho_ptr:0.0;
+        double cs0 =*cs_ptr , acs =acs_ptr ?*acs_ptr :0.0;
+        double xmin=xmin_ptr?*xmin_ptr:1e-4;
+        double Qd  =Qd_ptr?*Qd_ptr:0.0;
+        double fmax=kick_ptr?*kick_ptr:0.3;
 
-        /* relative velocity (updated by mass transfer & AM correction) */
-        const double vrelx   = accretor->vx - donor->vx;
-        const double vrely   = accretor->vy - donor->vy;
-        const double vrelz   = accretor->vz - donor->vz;
-        const double vrel    = sqrt(vrelx*vrelx + vrely*vrely + vrelz*vrelz);
+        double s=r/Rd;
+        double rho=rho0*pow(s,arho);
+        double cs =cs0 *pow(s,acs);
 
-        if (vrel > 0. && rho > 0.){
-            const double mach = vrel / cs;
-            const double I    = calculate_pre_factor(mach, (ce_xmin>0.?ce_xmin:1e-4));
-
-            /* gravitational drag term (Ostriker 1999; vector form) */
-            const double m_a   = accretor->m;
-            double fc  = 4.*M_PI*sim->G*sim->G * m_a * rho / (vrel*vrel*vrel) * I;
-
-            /* direct hydrodynamic (accretion) term, optional */
-            if (ce_Qd > 0. && accretor->r > 0.){
-                fc += M_PI * rho * accretor->r * accretor->r * vrel * ce_Qd / m_a;
+        double vrelx=a->vx-d->vx, vrely=a->vy-d->vy, vrelz=a->vz-d->vz;
+        double vrel=sqrt(vrelx*vrelx+vrely*vrely+vrelz*vrelz);
+        if (vrel>0 && rho>0){
+            double I=I_prefactor(vrel/cs, xmin);
+            double fc=4.*M_PI*sim->G*sim->G*a->m*rho/(vrel*vrel*vrel)*I;
+            if (Qd>0 && a->r>0)
+                fc+=M_PI*rho*a->r*a->r*vrel*Qd/a->m;
+            double dvx=-fc*vrelx*dt, dvy=-fc*vrely*dt, dvz=-fc*vrelz*dt;
+            double dv=sqrt(dvx*dvx+dvy*dvy+dvz*dvz);
+            double cap=fmax*vrel;
+            if (dv>cap){
+                double s=cap/dv; dvx*=s; dvy*=s; dvz*=s;
             }
-
-            /* Δv for accretor */
-            double dvx = -fc * vrelx * dt;
-            double dvy = -fc * vrely * dt;
-            double dvz = -fc * vrelz * dt;
-
-            /* --- safety cap: |Δv| ≤ f_max v_rel ------------------------- */
-            const double dv_mag = sqrt(dvx*dvx + dvy*dvy + dvz*dvz);
-            const double vcap   = ce_kick_frac * vrel;
-            if (dv_mag > vcap){
-                const double scale = vcap / dv_mag;
-                dvx *= scale;  dvy *= scale;  dvz *= scale;
-            }
-
-            /* apply to accretor */
-            accretor->vx += dvx;
-            accretor->vy += dvy;
-            accretor->vz += dvz;
-
-            /* back‑reaction on donor’s core */
-            if (donor->m > 0.){
-                donor->vx -= dvx * (m_a / donor->m);
-                donor->vy -= dvy * (m_a / donor->m);
-                donor->vz -= dvz * (m_a / donor->m);
+            a->vx+=dvx; a->vy+=dvy; a->vz+=dvz;
+            if (d->m>0){
+                double f=a->m/d->m;
+                d->vx-=dvx*f; d->vy-=dvy*f; d->vz-=dvz*f;
             }
         }
     }
 
-    /* ----------------------------------------------------------------------
-     *  STEP 3 :  Gravitational‑wave back‑reaction (optional)
-     * ------------------------------------------------------------------- */
-    if (gw_c_ptr && (*gw_c_ptr > 0.) && gw_on_ptr && (*gw_on_ptr != 0)){
-        /* Current orbit *after* mass‑transfer & CE‑drag */
-        struct reb_orbit o = reb_orbit_from_particle(sim->G, *donor, *accretor);
+    /* ------------------------------------------------------------------ */
+    /*  STEP 3 – GW back‑reaction (unchanged)                             */
+    /* ------------------------------------------------------------------ */
+    if (c_ptr && gw_on_ptr && *gw_on_ptr && *c_ptr>0){
+        struct reb_orbit o=reb_orbit_from_particle(sim->G,*d,*a);
+        if (o.a>0){
+            double m1=d->m, m2=a->m, c=*c_ptr, e=o.e, a0=o.a;
+            double G3=sim->G*sim->G*sim->G;
+            double da=-64./5.*G3*m1*m2*(m1+m2)/(pow(c,5)*pow(a0,3)*pow(1-e*e,3.5))
+                      *(1+73./24.*e*e+37./96.*e*e*e*e);
+            double de=-304./15.*e*G3*m1*m2*(m1+m2)/(pow(c,5)*pow(a0,4)*pow(1-e*e,2.5))
+                      *(1+121./304.*e*e);
+            double anew=a0+da*dt, enew=e+de*dt;
+            if (anew<0)anew=0; if (enew<0)enew=0;
+            if (enew>0.999999)enew=0.999999;
 
-        if (o.a > 0.){
-            const double m1 = donor->m;
-            const double m2 = accretor->m;
-            const double c  = *gw_c_ptr;
-            const double e  = o.e;
-            const double a  = o.a;
-            const double G3 = sim->G * sim->G * sim->G;
+            double Mtot=m1+m2;
+            double Rcmx=(m1*d->x+m2*a->x)/Mtot;
+            double Rcmy=(m1*d->y+m2*a->y)/Mtot;
+            double Rcmz=(m1*d->z+m2*a->z)/Mtot;
+            double Vcmx=(m1*d->vx+m2*a->vx)/Mtot;
+            double Vcmy=(m1*d->vy+m2*a->vy)/Mtot;
+            double Vcmz=(m1*d->vz+m2*a->vz)/Mtot;
 
-            /* Peters’ secular rates */
-            const double fac_a = -64./5. * G3*m1*m2*(m1+m2) /
-                                 (pow(c,5)*pow(a,3)*pow(1.-e*e,3.5)) *
-                                 (1.+73./24.*e*e + 37./96.*e*e*e*e);
+            struct reb_particle np=
+                reb_particle_from_orbit(sim->G,*a,m1,
+                                        anew,enew,
+                                        o.inc,o.Omega,o.omega,o.f);
 
-            const double fac_e = -304./15. * e * G3*m1*m2*(m1+m2) /
-                                 (pow(c,5)*pow(a,4)*pow(1.-e*e,2.5)) *
-                                 (1.+121./304.*e*e);
+            double rx=np.x-a->x, ry=np.y-a->y, rz=np.z-a->z;
+            double vx=np.vx-a->vx, vy=np.vy-a->vy, vz=np.vz-a->vz;
 
-            double a_new = a + fac_a * dt;
-            double e_new = e + fac_e * dt;
-
-            if (a_new < 0.)       a_new = 0.;
-            if (e_new < 0.)       e_new = 0.;
-            if (e_new > 0.999999) e_new = 0.999999;
-
-            /* -------- keep system barycentre fixed -------------------- */
-            const double Mtot = m1 + m2;
-            const double Rcmx = (m1*donor->x  + m2*accretor->x) / Mtot;
-            const double Rcmy = (m1*donor->y  + m2*accretor->y) / Mtot;
-            const double Rcmz = (m1*donor->z  + m2*accretor->z) / Mtot;
-            const double Vcmx = (m1*donor->vx + m2*accretor->vx) / Mtot;
-            const double Vcmy = (m1*donor->vy + m2*accretor->vy) / Mtot;
-            const double Vcmz = (m1*donor->vz + m2*accretor->vz) / Mtot;
-
-            /* Generate NEW relative orbit (donor around accretor) */
-            struct reb_particle np =
-                reb_particle_from_orbit(sim->G, *accretor, m1,
-                                        a_new, e_new,
-                                        o.inc, o.Omega, o.omega, o.f);
-
-            /* relative vectors (new) */
-            const double rx_rel = np.x - accretor->x;
-            const double ry_rel = np.y - accretor->y;
-            const double rz_rel = np.z - accretor->z;
-
-            const double vx_rel = np.vx - accretor->vx;
-            const double vy_rel = np.vy - accretor->vy;
-            const double vz_rel = np.vz - accretor->vz;
-
-            /* place the two bodies around the *same* barycentre */
-            const double frac_d =   m2 / Mtot;   /* donor offset factor      */
-            const double frac_a =  -m1 / Mtot;   /* accretor offset factor   */
-
-            donor->x  = Rcmx + frac_d * rx_rel;
-            donor->y  = Rcmy + frac_d * ry_rel;
-            donor->z  = Rcmz + frac_d * rz_rel;
-
-            accretor->x = Rcmx + frac_a * rx_rel;
-            accretor->y = Rcmy + frac_a * ry_rel;
-            accretor->z = Rcmz + frac_a * rz_rel;
-
-            donor->vx = Vcmx + frac_d * vx_rel;
-            donor->vy = Vcmy + frac_d * vy_rel;
-            donor->vz = Vcmz + frac_d * vz_rel;
-
-            accretor->vx = Vcmx + frac_a * vx_rel;
-            accretor->vy = Vcmy + frac_a * vy_rel;
-            accretor->vz = Vcmz + frac_a * vz_rel;
+            double fd=m2/Mtot, fa=-m1/Mtot;
+            d->x=Rcmx+fd*rx; d->y=Rcmy+fd*ry; d->z=Rcmz+fd*rz;
+            a->x=Rcmx+fa*rx; a->y=Rcmy+fa*ry; a->z=Rcmz+fa*rz;
+            d->vx=Vcmx+fd*vx; d->vy=Vcmy+fd*vy; d->vz=Vcmz+fd*vz;
+            a->vx=Vcmx+fa*vx; a->vy=Vcmy+fa*vy; a->vz=Vcmz+fa*vz;
         }
     }
 
-    /* ------------------------------------------------------------------- */
-    /* Remove donor if fully evaporated, detach operator                   */
-    if (donor->m <= 0.){
-        reb_simulation_remove_particle(sim, donor_idx, 1);
-        rebx_remove_operator(rebx, operator);      /* stops further calls */
-        reb_simulation_move_to_com(sim);
-        return;
+    /* ------------------------------------------------------------------ */
+    /*  STEP 4 – merge if overlap                                          */
+    /* ------------------------------------------------------------------ */
+    double merge_eps = merge_eps_ptr ? *merge_eps_ptr : 1e-2; /* 1 cm */
+    double dxm=d->x-a->x, dym=d->y-a->y, dzm=d->z-a->z;
+    double r2merge=dxm*dxm+dym*dym+dzm*dzm;
+    if (r2merge<=merge_eps*merge_eps){
+        /* merge: keep donor index, remove accretor */
+        double msum=d->m+a->m;
+        if (msum<=0){                                              /* rare   */
+            d->m=0;
+        }else{
+            /* barycentre position & velocity for linear‑momentum cons. */
+            d->x=(d->m*d->x+a->m*a->x)/msum;
+            d->y=(d->m*d->y+a->m*a->y)/msum;
+            d->z=(d->m*d->z+a->m*a->z)/msum;
+            d->vx=(d->m*d->vx+a->m*a->vx)/msum;
+            d->vy=(d->m*d->vy+a->m*a->vy)/msum;
+            d->vz=(d->m*d->vz+a->m*a->vz)/msum;
+            d->m = msum;
+            d->r = fmax(d->r, a->r);
+        }
+        /* remove accretor (higher index keeps donor pointer valid) */
+        if (accretor_idx>donor_idx){
+            reb_simulation_remove_particle(sim, accretor_idx, 1);
+        }else{
+            reb_simulation_remove_particle(sim, accretor_idx, 1);
+            donor_idx--; /* donor index shifted */
+            d=&sim->particles[donor_idx];
+        }
+        /* detach the operator if only one body left */
+        if (sim->N<2){
+            rebx_remove_operator(rebx, op);
+            reb_simulation_move_to_com(sim);
+            return;
+        }
     }
 
-    /* Re‑centre the simulation (cheap, keeps integrator happy)            */
+    /* ------------------------------------------------------------------ */
+    /*  STEP 5 – purge zero‑mass particles                                 */
+    /* ------------------------------------------------------------------ */
+    for (int i=sim->N-1;i>=0;--i){
+        if (sim->particles[i].m<=0){
+            reb_simulation_remove_particle(sim, i, 1);
+            if (i==donor_idx || i==accretor_idx){
+                /* if we removed one of the binary components, stop operator */
+                rebx_remove_operator(rebx, op);
+                reb_simulation_move_to_com(sim);
+                return;
+            }
+        }
+    }
+
+    /* finally recentre */
     reb_simulation_move_to_com(sim);
 }
