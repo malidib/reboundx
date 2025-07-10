@@ -31,6 +31,6 @@ rl.params['ce_alpha_cs'] = 0.0
 rl.params['ce_xmin'] = 0.01
 rl.params['ce_Qd'] = 1.0
 
-for t in np.logspace(-3,0,1000):
+for t in np.logspace(-3,1,1000):
 	sim.integrate(t)
 	print(t,sim.particles[0].m, 'a={:.4f}'.format(sim.particles[1].a))
