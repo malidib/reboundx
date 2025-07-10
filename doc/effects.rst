@@ -519,6 +519,80 @@ particles[i].r (double)      Yes         Physical radius of the donor and compan
 ============================ =========== ============================================
 
 
+.. _stellar_wind_mass_loss:
+
+stellar_wind_mass_loss
+**********************
+
+======================= ===============================================
+Authors                 M. Ali-Dib
+Implementation Paper    `Reimers 1975 <https://ui.adsabs.harvard.edu/abs/1975MSRSL...8..369R/abstract>`_
+Based on                None
+C Example               :ref:`c_example_stellar_wind_mass_loss`
+Python Example          `stellar_wind_mass_loss.py <https://github.com/dtamayo/reboundx>`_
+======================= ===============================================
+
+Applies continuous stellar wind mass loss using the Reimers prescription.
+Optional operator parameters allow adjusting unit conversions and the
+prefactor.
+
+**Effect Parameters**
+
+============================ =========== ======================================
+Field (C type)               Required    Description
+============================ =========== ======================================
+swml_const (double)          No          Prefactor in Msun/yr (default 4e-13)
+swml_Msun  (double)          No          Solar mass in code units
+swml_Rsun  (double)          No          Solar radius in code units
+swml_Lsun  (double)          No          Solar luminosity in code units
+============================ =========== ======================================
+
+**Particle Parameters**
+
+============================ =========== ======================================
+Field (C type)               Required    Description
+============================ =========== ======================================
+swml_eta (double)            Yes         Efficiency parameter
+swml_L   (double)            Yes         Stellar luminosity
+swml_R   (double)            Yes         Stellar radius
+============================ =========== ======================================
+
+.. _stellar_evolution_sse:
+
+stellar_evolution_sse
+*********************
+
+======================= ===============================================
+Authors                 M. Ali-Dib
+Implementation Paper    `Hurley et al., 2000 <https://ui.adsabs.harvard.edu/abs/2000MNRAS.315..543H/abstract>`_
+Based on                Approximate SSE scalings
+C Example               :ref:`c_example_stellar_evolution_sse`
+Python Example          `stellar_evolution_sse.py <https://github.com/dtamayo/reboundx>`_
+======================= ===============================================
+
+Updates stellar radius and luminosity according to simplified analytic
+single-star evolution relations.  Tracks a particle's age via the
+``sse_age`` parameter and updates ``swml_R`` and ``swml_L`` accordingly.
+
+**Effect Parameters**
+
+============================ =========== ======================================
+Field (C type)               Required    Description
+============================ =========== ======================================
+sse_Msun (double)            No          Solar mass in code units
+sse_Rsun (double)            No          Solar radius in code units
+sse_Lsun (double)            No          Solar luminosity in code units
+============================ =========== ======================================
+
+**Particle Parameters**
+
+============================ =========== ======================================
+Field (C type)               Required    Description
+============================ =========== ======================================
+sse_age (double)             Yes         Stellar age
+============================ =========== ======================================
+
+
 Tides
 ^^^^^^^^^^^^^^^^^^
 

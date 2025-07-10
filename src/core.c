@@ -157,6 +157,17 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "ce_Qd", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "gw_decay_on", REBX_TYPE_INT);
     rebx_register_param(rebx, "gw_c", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_eta", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_L", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_R", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_const", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_Msun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_Rsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_Lsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_age", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_Msun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_Rsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_Lsun", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
@@ -416,6 +427,14 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
     }
     if (strcmp(name, "modify_mass") == 0){
         operator->step_function = rebx_modify_mass;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
+    else if (strcmp(name, "stellar_wind_mass_loss") == 0){
+        operator->step_function = rebx_stellar_wind_mass_loss;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
+    else if (strcmp(name, "stellar_evolution_sse") == 0){
+        operator->step_function = rebx_stellar_evolution_sse;
         operator->operator_type = REBX_OPERATOR_UPDATER;
     }
     else if (strcmp(name, "roche_lobe_mass_transfer") == 0){

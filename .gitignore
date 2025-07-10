@@ -26,6 +26,8 @@ doc/html/*
 doc/latex/*
 !doc/latex/common_envelope_drag.tex
 !doc/latex/gravitational_wave_decay.tex
+!doc/latex/stellar_wind_mass_loss.tex
+!doc/latex/stellar_evolution_tracks.tex
 doc/Doxyfile
 MANIFEST
 reboundx.egg-info
