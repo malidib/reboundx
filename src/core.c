@@ -149,6 +149,18 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "rlmt_Hp", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "rlmt_mdot0", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "rlmt_loss_fraction", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "jloss_mode", REBX_TYPE_INT);
+    rebx_register_param(rebx, "jloss_factor", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_skip_in_CE", REBX_TYPE_INT);
+    rebx_register_param(rebx, "rlmt_substep_max_dm", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_substep_max_dr", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_min_substeps", REBX_TYPE_INT);
+    rebx_register_param(rebx, "ce_profile_file", REBX_TYPE_POINTER);
+    rebx_register_param(rebx, "ce_kick_cfl", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "merge_eps", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_R_slope", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_R_ref_mass", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_R_ref_radius", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_rho0", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_alpha_rho", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_cs", REBX_TYPE_DOUBLE);
