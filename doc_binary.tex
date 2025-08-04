@@ -373,11 +373,13 @@ relative velocity $\mathbf{v}$, the force adds to the relative acceleration
 \begin{align}
 \mathbf{a}_{1\mathrm{PN}} &= -\frac{G m}{r^2 c^2}\Bigl[\mathbf{n}\bigl((1+3\eta)v^2 - 2(2+\eta)\frac{G m}{r}-\tfrac{3}{2}\eta\dot r^2\bigr)
  +(4-2\eta)\dot r\,\mathbf{v}\Bigr],\\
-\mathbf{a}_{2.5\mathrm{PN}} &= \frac{8 G^2 m^2 \eta}{5 c^5 r^3}\Bigl[\dot r\Bigl(3\frac{G m}{r}+v^2\Bigr)\mathbf{n}-\Bigl(\frac{G m}{r}+v^2\Bigr)\mathbf{v}\Bigr],
+\mathbf{a}_{2.5\mathrm{PN}} &= \frac{8 G^2 m^2 \eta}{5 c^5 r^3}\Bigl[\dot r\Bigl(18 v^2 + \tfrac{2}{3}\frac{G m}{r}-25\dot r^2\Bigr)\mathbf{n}-\Bigl(6 v^2 - 2\frac{G m}{r}-15\dot r^2\Bigr)\mathbf{v}\Bigr],
 \end{align}
 where $m=m_i+m_j$, $\eta=m_i m_j/m^2$, $\mathbf{n}=\mathbf{r}/r$, and
-$\dot r = \mathbf{v}\cdot\mathbf{n}$. The relative acceleration is distributed
-to the two particles in proportion to their masses, preserving linear momentum.
+$\dot r = \mathbf{v}\cdot\mathbf{n}$. These expressions correspond to
+Eqs.~2.2b and~2.2f of \citet{Kidder1995}. The relative acceleration is
+distributed to the two particles in proportion to their masses, preserving
+linear momentum.
 
 The only required effect parameter is the speed of light $c$, specified through
 the field name \texttt{c}. Setting $c$ consistently with the simulation units
