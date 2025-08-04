@@ -102,7 +102,9 @@ The donor’s instantaneous mass‑loss rate follows
 \label{eq:Ritter}
 \end{equation}
 with the exponent clamped to $\le80$ to avoid floating‑point overflow
-(\texttt{RLMT\_EXP\_CLAMP}).  
+(\texttt{RLMT\_EXP\_CLAMP}).
+
+\paragraph{Envelope veto.} If \texttt{rlmt\_skip\_in\_CE}=1\ (the default), the RLOF calculation is bypassed whenever the accretor resides inside the donor’s radius ($r<R_*$), allowing common‑envelope drag to dominate.
 
 \paragraph{Non‑conservative transfer.}
 A user‑set fraction $f_{\mathrm loss}\in[0,1]$ escapes as a wind,
@@ -119,13 +121,14 @@ Four prescriptions can be selected at run time:
 \mathbf v_{\mathrm loss} &= \mathbf v_{\mathrm d} & (\text{mode }0)\\
                          &= \mathbf v_{\mathrm a} & (\text{mode }1)\\
                          &= \mathbf v_{\mathrm cm}& (\text{mode }2)\\
-                         &= \mathbf v_{\mathrm d} + f_j\,\mathbf e_\perp 
-                            \frac{j_{\rm orb}}{a} & (\text{mode }3),
+                         &= \mathbf v_{\mathrm d} + f_j\,\mathbf e_\perp
+                            \frac{j_{\rm orb}}{\lvert\mathbf r\rvert} & (\text{mode }3),
 \end{align}
 \end{subequations}
 where $\mathbf e_\perp$ is any unit vector orthogonal to the separation
-vector and $j_{\rm orb}=|\mathbf r\times\mathbf v|\,\mu^{-1}$
-with reduced mass $\mu=M_{\mathrm d}M_{\mathrm a}/(M_{\mathrm d}+M_{\mathrm a})$.
+vector, $j_{\rm orb}=|\mathbf r\times\mathbf v|\,\mu^{-1}$ with reduced mass
+$\mu=M_{\mathrm d}M_{\mathrm a}/(M_{\mathrm d}+M_{\mathrm a})$, and
+$r=|\mathbf r|$ is the instantaneous separation.
 
 \paragraph{Momentum bookkeeping and angular‑momentum correction.}
 Accreted material arrives with the donor’s velocity, while wind
@@ -135,7 +138,9 @@ velocity shift
 \(
 \delta\mathbf v=(\Delta\mathbf L\times\mathbf r_{\mathrm a})/(M_{\mathrm a}r_{\mathrm a}^2)
 \)
-is applied to the accretor to restore the $N$‑body Jacobi constant.
+is applied to the accretor to restore the $N$‑body Jacobi constant, with the
+donor receiving the opposite kick scaled by $M_{\mathrm a}/M_{\mathrm d}$ to
+conserve linear momentum.
 
 \paragraph{Donor radius evolution (optional).}
 If the donor carries attributes
@@ -199,7 +204,8 @@ in highly supersonic or stratified flows.
 \paragraph{Numerical stability.}
 The denominator $v_{\rm rel}^3$ is left \emph{unfloored}; instead the code
 ensures $v_{\rm rel}$ never becomes arbitrarily small via the
-sub‑step criterion $\Delta r/r\le\texttt{rlmt\_substep\_max\_dr}$.
+sub‑step criterion $\Delta r/r\le\texttt{rlmt\_substep\_max\_dr}$ and likewise
+limits mass changes through $\Delta M/M\le\texttt{rlmt\_substep\_max\_dm}$.
 Users who require an explicit floor can modify the source accordingly.
 
 %-------------------------------------------------------------------------------
@@ -207,7 +213,9 @@ Users who require an explicit floor can modify the source accordingly.
 \label{sec:gw}
 
 Quadrupolar GW emission follows the classic Peters equations
-\citep{Peters1964}:
+\citep{Peters1964}. This step is executed only when
+\texttt{gw\_decay\_on}=1 and a positive \texttt{gw\_c} (speed of light) is
+supplied; otherwise the decay is skipped:
 \begin{align}
 \frac{da}{dt} &=
 -\frac{64}{5}\,\frac{G^3M_1M_2(M_1+M_2)}{c^5a^3(1-e^2)^{7/2}}
@@ -226,15 +234,24 @@ M\gets M+\tfrac12(n_{\rm old}+n_{\rm new})\Delta t
 to achieve second‑order phase accuracy.
 
 \paragraph{Coalescence guard.}
-If the new semi‑major axis falls below
-$\varepsilon_{\rm merge}=0.5\min(R_1,R_2)$
-(or becomes non‑finite) the two particles are merged immediately.
-No explicit time‑step limiter based on $t_{\rm GW}=|a/\dot a|$ is
-implemented; accuracy relies on the generic sub‑stepper and
-user‑selected global step size.
+If the new semi‑major axis falls below the merge threshold
+$\varepsilon_{\rm merge}$ (parameter \texttt{merge\_eps} or
+$0.5\min(R_1,R_2)$ by default) or becomes non‑finite, the two particles are
+merged immediately. No explicit time‑step limiter based on
+$t_{\rm GW}=|a/\dot a|$ is implemented; accuracy relies on the generic
+sub‑stepper and user‑selected global step size.
 
 %-------------------------------------------------------------------------------
 \section{Algorithmic Flow}
+
+Each operator call subdivides the requested time span into at least
+\texttt{rlmt\_min\_substeps} internal steps.  The sub‑step size obeys the
+limits $|\Delta M|/M\le\texttt{rlmt\_substep\_max\_dm}$ and
+$|\Delta r|/r\le\texttt{rlmt\_substep\_max\_dr}$ to control mass transfer and
+orbital motion.  An initial guard merges the pair if their separation falls
+below $\varepsilon_{\rm merge}$, where
+$\varepsilon_{\rm merge}=\texttt{merge\_eps}$ or
+$0.5\min(R_{*},R_{\rm acc})$ when unspecified.
 
 \begin{enumerate}[nosep]
 \item \textbf{Pre‑check:} merge guard if $r\le\varepsilon_{\rm merge}$.
@@ -286,8 +303,8 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{ce\_xmin}           (op) & — & $10^{-4}$ & Coulomb cutoff $x_{\min}$\\
 \texttt{ce\_Qd}             (op) & — & 0 & Geometric drag coefficient\\[0.2em]
 %
-\texttt{gw\_c}              (op) & length/t & $c$ & Speed of light\\
-\texttt{gw\_decay\_on}      (op) & bool & 1 & Toggle GW back‑reaction\\[0.2em]
+\texttt{gw\_c}              (op) & length/t & — & Speed of light (required)\\
+\texttt{gw\_decay\_on}      (op) & bool & 0 & Toggle GW back‑reaction\\[0.2em]
 %
 \texttt{merge\_eps}         (op) & length & $0.5\min(R_*,R_{\rm acc})$ & Merge radius\\
 \bottomrule
