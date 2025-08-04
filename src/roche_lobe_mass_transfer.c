@@ -1,7 +1,7 @@
 /* ============================================================================
  * @file    roche_lobe_mass_transfer.c
  * @brief   Binary‑star sink operator with RLOF, systemic mass‑loss,
- *          common‑envelope drag, GW decay, adaptive sub‑stepping,
+ *          common‑envelope drag, adaptive sub‑stepping,
  *          and extensive robustness guards           (2025‑07‑10 rev B).
  * ----------------------------------------------------------------------------
  *  New operator parameters (all optional, operator scope)
@@ -391,86 +391,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
         }
 
 /* =======================================================================
- *  STEP 3 – Gravitational‑wave back‑reaction (Peters 1964, phase‑safe)
- * ===================================================================== */
-        const double *c_ptr      = rebx_get_param(rebx, op->ap,"gw_c");
-        const int    *gw_on_ptr  = rebx_get_param(rebx, op->ap,"gw_decay_on");
-
-        if(c_ptr && gw_on_ptr && *gw_on_ptr && *c_ptr > 0.0){
-            struct reb_orbit o = reb_orbit_from_particle(sim->G, *d, *a);
-            if(o.a > 0.0){
-                double m1 = d->m, m2 = a->m, c = *c_ptr;
-                double e  = o.e, a0 = o.a;
-                double G3 = sim->G*sim->G*sim->G;
-
-                double da_dt = -64./5.*G3*m1*m2*(m1+m2) /
-                               (pow(c,5)*pow(a0,3)*pow(1-e*e,3.5)) *
-                               (1 + 73./24.*e*e + 37./96.*e*e*e*e);
-                double de_dt = -304./15.*e*G3*m1*m2*(m1+m2) /
-                               (pow(c,5)*pow(a0,4)*pow(1-e*e,2.5)) *
-                               (1 + 121./304.*e*e);
-
-                double anew = a0 + da_dt * dt;
-                double enew = e  + de_dt * dt;
-
-                /* === coalescence / NaN guard ============================ */
-                if(!isfinite(anew) || anew <= merge_eps){
-                    /* merge and bail out */
-                    double msum = d->m + a->m;
-                    if(msum <= 0.0){
-                        d->m = 0.0;
-                    } else {
-                        d->x  = (d->m*d->x  + a->m*a->x ) / msum;
-                        d->y  = (d->m*d->y  + a->m*a->y ) / msum;
-                        d->z  = (d->m*d->z  + a->m*a->z ) / msum;
-                        d->vx = (d->m*d->vx + a->m*a->vx) / msum;
-                        d->vy = (d->m*d->vy + a->m*a->vy) / msum;
-                        d->vz = (d->m*d->vz + a->m*a->vz) / msum;
-                        d->m  = msum;
-                        d->r  = MAX(d->r, a->r);
-                    }
-                    reb_simulation_remove_particle(sim, acc_idx, 1);
-                    if(sim->N < 2) rebx_remove_operator(rebx, op);
-                    reb_simulation_move_to_com(sim);
-                    return;
-                }
-
-                enew = MIN(MAX(enew, 0.0), 0.999999);
-                anew = MAX(anew, merge_eps);   /* keep finite */
-
-                /* mean anomaly evolution (trapezoidal in n) -------------- */
-                double n0 = sqrt(sim->G*(m1+m2)/pow(a0 ,3));
-                double n1 = sqrt(sim->G*(m1+m2)/pow(anew,3));
-                double M0 = o.M;
-                double M1 = M0 + 0.5*(n0 + n1) * dt;
-                M1 = fmod(M1, 2.*M_PI); if(M1 < 0.0) M1 += 2.*M_PI;
-
-                struct reb_particle p_new =
-                    reb_particle_from_orbit(sim->G, *a, m1,
-                                            anew, enew,
-                                            o.inc, o.Omega, o.omega,
-                                            M1);   /* mean anomaly */
-
-                double rx = p_new.x - a->x;
-                double ry = p_new.y - a->y;
-                double rz = p_new.z - a->z;
-                double vx = p_new.vx - a->vx;
-                double vy = p_new.vy - a->vy;
-                double vz = p_new.vz - a->vz;
-
-                double Mtot = m1 + m2;
-                double fd =  m2 / Mtot;
-                double fa = -m1 / Mtot;
-
-                d->x  += fd*rx;  d->y  += fd*ry;  d->z  += fd*rz;
-                a->x  += fa*rx;  a->y  += fa*ry;  a->z  += fa*rz;
-                d->vx += fd*vx;  d->vy += fd*vy;  d->vz += fd*vz;
-                a->vx += fa*vx;  a->vy += fa*vy;  a->vz += fa*vz;
-            }
-        }
-
-/* =======================================================================
- *  STEP 4 – Merge if separation < merge_eps (fallback)
+ *  STEP 3 – Merge if separation < merge_eps (fallback)
  * ===================================================================== */
         dx = d->x - a->x; dy = d->y - a->y; dz = d->z - a->z;
         if(dx*dx + dy*dy + dz*dz <= merge_eps*merge_eps){
@@ -494,7 +415,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
         }
 
 /* =======================================================================
- *  STEP 5 – purge zero‑mass particles
+ *  STEP 4 – purge zero‑mass particles
  * ===================================================================== */
         for(int i = sim->N-1; i >= 0; --i){
             if(sim->particles[i].m <= 0.0){

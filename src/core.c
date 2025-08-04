@@ -167,8 +167,6 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "ce_alpha_cs", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_xmin", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_Qd", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "gw_decay_on", REBX_TYPE_INT);
-    rebx_register_param(rebx, "gw_c", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_eta", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_L", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_R", REBX_TYPE_DOUBLE);
