@@ -24,11 +24,12 @@
 
 \title{\textsc{Binary‑Star Evolution Modules in
          \textnormal{REBOUNDx}}:\\
-       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, Simplified
+       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, Thermally Driven Winds, Simplified
        Stellar Evolution, and Relativity}
 \author{Operator files: \texttt{roche\_lobe\_mass\_transfer.c},
         \texttt{magnetic\_braking.c},
         \texttt{stellar\_wind\_mass\_loss.c},
+        \texttt{thermally\_driven\_winds.c},
         \texttt{stellar\_evolution\_sse.c},
         \texttt{post\_newtonian.c}\\
         Revision B – 10 July 2025}
@@ -44,8 +45,8 @@ The Roche‑lobe mass transfer operator combines overflow, non‑conservative
 systemic winds, and common‑envelope drag within a momentum‑conserving
 framework featuring adaptive sub‑stepping and robust merge guards.
 Separate operators implement magnetic braking, isotropic stellar‑wind
-mass loss, simplified stellar‑evolution scalings, and post‑Newtonian
-relativistic corrections through 2.5PN order.  Equations are derived,
+mass loss, thermally driven winds, simplified stellar‑evolution scalings,
+and post‑Newtonian relativistic corrections through 2.5PN order.  Equations are derived,
 parameters are tabulated, and algorithmic
 choices are clarified so that this document can serve as an archival,
 citable reference.
@@ -55,7 +56,7 @@ citable reference.
 \section{Background and Motivation}
 \label{sec:intro}
 Roche‑lobe overflow, common‑envelope evolution, stellar winds,
-magnetic braking, simplified stellar evolution, and relativistic effects
+thermally driven winds, magnetic braking, simplified stellar evolution, and relativistic effects
 govern the orbital fates of close binaries\citep{Eggleton1983,Ostriker1999,
 Peters1964,Reimers1975,Verbunt1981,Kawaler1988,Hurley2000}.  Hydrodynamic
 simulations capture these effects but are computationally prohibitive for
@@ -306,6 +307,41 @@ Name (scope) & Unit & Default & Purpose \\
 \end{tabular}
 \end{table}
 
+\subsection{Thermally Driven Winds}
+\label{sec:tdw}
+
+Thermal pressure can launch isotropic winds that carry away mass. For a star
+of mass $M$, surface temperature $T$, and radius $R$, we adopt
+\[
+\dot M = -C_{\rm th}\,\eta\,\left(\frac{R}{R_\odot}\right)^2\left(\frac{T}{T_\odot}\right)^2\frac{M_\odot}{M}
+\;M_\odot\,\mathrm{yr}^{-1},
+\]
+where the dimensionless efficiency $\eta$ along with $T$ and $R$ are provided
+per particle.  Mass is removed isotropically with no linear-momentum recoil,
+virtual particles are ignored, and after mass loss the system is recentred on
+the centre of mass.  The prefactor, solar reference values, and the year length
+can be adjusted via operator parameters (Table~\ref{tab:tdw}).
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{Thermally driven wind parameters}
+\label{tab:tdw}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Name (scope) & Unit & Default & Purpose \\
+\midrule
+\texttt{tdw\_eta} (part) & — & — & Wind efficiency $\eta$\\
+\texttt{tdw\_T}   (part) & temperature & — & Surface temperature $T$\\
+\texttt{tdw\_R}   (part) & length & — & Stellar radius $R$\\[0.2em]
+\texttt{tdw\_const} (op) & $M_\odot$/yr & $1\times10^{-14}$ & Thermal-wind prefactor\\
+\texttt{tdw\_Msun}  (op) & mass & 1 & Solar mass in code units\\
+\texttt{tdw\_Rsun}  (op) & length & 1 & Solar radius in code units\\
+\texttt{tdw\_Tsun}  (op) & temperature & 1 & Solar temperature in code units\\
+\texttt{tdw\_year}  (op) & time & 1 & Length of Julian year in code units\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{Simplified Stellar Evolution}
 \label{sec:sse}
 
@@ -450,9 +486,7 @@ Field & Unit & Description \\
 %-------------------------------------------------------------------------------
 \section{Discussion and Future Extensions}
 \label{sec:future}
-Future work may add
-(i) thermally driven winds and
-(ii) direct coupling to tabulated stellar‑evolution tracks
+Future work may add direct coupling to tabulated stellar‑evolution tracks
 so that $R_*(M)$ and $H_P(M)$ evolve self‑consistently.
 
 %-------------------------------------------------------------------------------
@@ -460,7 +494,8 @@ so that $R_*(M)$ and $H_P(M)$ evolve self‑consistently.
 We have brought the LaTeX documentation in line with the
 \texttt{C} implementations of the
 \texttt{roche\_lobe\_mass\_transfer}, \texttt{magnetic\_braking},
-\texttt{stellar\_wind\_mass\_loss}, \texttt{stellar\_evolution\_sse}, and
+\texttt{stellar\_wind\_mass\_loss}, \texttt{thermally\_driven\_winds},
+\texttt{stellar\_evolution\_sse}, and
 \texttt{post\_newtonian} modules.
 All physical assumptions, numerical safeguards, and run‑time parameters
 are now accurately reflected, enabling reliable use and further
