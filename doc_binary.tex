@@ -358,6 +358,30 @@ Name (scope) & Unit & Default & Purpose \\
 \end{table}
 
 %-------------------------------------------------------------------------------
+\section{Post-Newtonian Relativistic Corrections}
+Beyond the quadrupolar gravitational-wave decay described above, compact binaries
+experience additional post-Newtonian forces that drive apsidal precession and
+couple the eccentricity and inclination. We provide a dedicated force
+\texttt{post\_newtonian} implementing the leading conservative $1$PN and
+dissipative $2.5$PN terms for every particle pair.
+
+For bodies with masses $m_i$ and $m_j$ separated by $\mathbf{r}$ and with
+relative velocity $\mathbf{v}$, the force adds to the relative acceleration
+\begin{align}
+\mathbf{a}_{1\mathrm{PN}} &= -\frac{G m}{r^2 c^2}\Bigl[\mathbf{n}\bigl((1+3\eta)v^2 - 2(2+\eta)\frac{G m}{r}-\tfrac{3}{2}\eta\dot r^2\bigr)
+ +(4-2\eta)\dot r\,\mathbf{v}\Bigr],\\
+\mathbf{a}_{2.5\mathrm{PN}} &= \frac{8 G^2 m^2 \eta}{5 c^5 r^3}\Bigl[\dot r\Bigl(3\frac{G m}{r}+v^2\Bigr)\mathbf{n}-\Bigl(\frac{G m}{r}+v^2\Bigr)\mathbf{v}\Bigr],
+\end{align}
+where $m=m_i+m_j$, $\eta=m_i m_j/m^2$, $\mathbf{n}=\mathbf{r}/r$, and
+$\dot r = \mathbf{v}\cdot\mathbf{n}$. The relative acceleration is distributed
+to the two particles in proportion to their masses, preserving linear momentum.
+
+The only required effect parameter is the speed of light $c$, specified through
+the field name \texttt{c}. Setting $c$ consistently with the simulation units
+reproduces the classical perihelion advance and gravitational-wave driven
+inspiral~\citep{Einstein1915, Peters1964, Kidder1995}.
+
+%-------------------------------------------------------------------------------
 \section{Numerical Tests}
 \label{sec:tests}
 The operator ships with a test suite (\texttt{tests/test\_rlmt\_*}):
@@ -401,6 +425,10 @@ development of the module.
   Ostriker,~E.\ 1999, \emph{ApJ}, 513, 252.
 \bibitem[Peters(1964)]{Peters1964}
   Peters,~P.\ 1964, \emph{Phys.\ Rev.}, 136, B1224.
+\bibitem[Kidder(1995)]{Kidder1995}
+  Kidder,~L.~E.\ 1995, \emph{Phys.\ Rev.\ D}, 52, 821.
+\bibitem[Einstein(1915)]{Einstein1915}
+  Einstein,~A.\ 1915, \emph{Preuss.\ Akad.\ Wiss.\ Berlin}, 831.
 \bibitem[Ritter(1988)]{Ritter1988}
   Ritter,~H.\ 1988, \emph{A\&A}, 202, 93.
 \bibitem[Verbunt \& Zwaan(1981)]{Verbunt1981}
