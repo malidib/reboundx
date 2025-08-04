@@ -138,9 +138,10 @@ velocity shift
 \(
 \delta\mathbf v=(\Delta\mathbf L\times\mathbf r_{\mathrm a})/(M_{\mathrm a}r_{\mathrm a}^2)
 \)
-is applied to the accretor to restore the $N$‑body Jacobi constant, with the
-donor receiving the opposite kick scaled by $M_{\mathrm a}/M_{\mathrm d}$ to
-conserve linear momentum.
+is applied to the accretor to compensate for the angular momentum carried by
+the transferred gas and keep the system’s total angular momentum unchanged.
+The donor receives the opposite kick scaled by $M_{\mathrm a}/M_{\mathrm d}$ so
+that linear momentum remains conserved.
 
 \paragraph{Donor radius evolution (optional).}
 If the donor carries attributes
@@ -157,7 +158,9 @@ enabling adiabatic or thermally driven mass‑radius responses.
 \label{sec:ce_drag}
 
 \paragraph{Drag acceleration.}
-A companion of mass $M_{\mathrm a}$ moving through envelope gas experiences
+When the accretor resides inside the donor ($r<R_*)$ and a density profile is
+available, a companion of mass $M_{\mathrm a}$ moving through envelope gas
+experiences
 \[
 \mathbf a_{\rm DF}=
 -\frac{4\pi\,G^2\,M_{\mathrm a}\,\rho}{v_{\rm rel}^3}\,
@@ -191,10 +194,13 @@ a Bondi–Hoyle‐like contribution
 is added.
 
 \paragraph{Envelope structure.}
-Density $\rho$ and sound speed $c_s$ are taken from either  
+Density $\rho$ and sound speed $c_s$ are taken from either
 (i) a power‑law $\rho=\rho_0s^{\alpha_\rho}$, $c_s=c_{s0}s^{\alpha_{c_s}}$
-or  
-(ii) a user‑supplied tabulated profile $(s,\rho,c_s)$ loaded at runtime.
+or
+(ii) a user‑supplied tabulated profile $(s,\rho,c_s)$ loaded once via
+\texttt{ce\_profile\_file}.  The table overrides the power‑law and is sampled
+with log–log linear interpolation.  If neither option is provided the CE drag
+step is skipped.
 
 \paragraph{CFL‑like limiter.}
 The velocity kick magnitude is limited to
@@ -226,18 +232,19 @@ supplied; otherwise the decay is skipped:
 \Bigl(1+\tfrac{121}{304}e^2\Bigr).
 \label{eq:de_dt}
 \end{align}
-A first‑order Euler step updates $a$ and $e$, while the mean anomaly is
-advanced with a trapezoidal rule
+\noindent A first‑order Euler step updates $a$ and $e$; the eccentricity is
+clipped to $0\le e<0.999999$ and the semi‑major axis is floored at
+$\varepsilon_{\rm merge}$ to maintain finiteness. The mean anomaly is advanced
+with a trapezoidal rule
 \(
 M\gets M+\tfrac12(n_{\rm old}+n_{\rm new})\Delta t
 \)
 to achieve second‑order phase accuracy.
 
 \paragraph{Coalescence guard.}
-If the new semi‑major axis falls below the merge threshold
-$\varepsilon_{\rm merge}$ (parameter \texttt{merge\_eps} or
-$0.5\min(R_1,R_2)$ by default) or becomes non‑finite, the two particles are
-merged immediately. No explicit time‑step limiter based on
+If the step drives the orbit below $\varepsilon_{\rm merge}$ or produces a
+non‑finite $a$, the two particles are merged immediately. No explicit
+time‑step limiter based on
 $t_{\rm GW}=|a/\dot a|$ is implemented; accuracy relies on the generic
 sub‑stepper and user‑selected global step size.
 
@@ -262,7 +269,9 @@ $0.5\min(R_{*},R_{\rm acc})$ when unspecified.
     \item GW back‑reaction (if enabled).
     \item Secondary merge guard.
   \end{enumerate}
-\item Purge zero‑mass particles, move system to its centre‑of‑mass.
+\item Purge zero‑mass particles.  If either the donor or accretor vanishes,
+      the operator detaches automatically; finally the system is recentred on
+      its centre of mass.
 \end{enumerate}
 
 %-------------------------------------------------------------------------------
@@ -298,7 +307,7 @@ Name (scope) & Unit & Default & Purpose \\
 %
 \texttt{ce\_rho0}, \texttt{ce\_cs}  (op) & cgs & — & Power‑law normalisations\\
 \texttt{ce\_alpha\_rho}, \texttt{ce\_alpha\_cs} (op) & — & 0 & Power‑law slopes\\
-\texttt{ce\_profile\_file}  (op) & path & — & Tabulated $(s,\rho,c_s)$ profile\\
+\texttt{ce\_profile\_file}  (op) & path & — & ASCII $(s,\rho,c_s)$ profile, overrides power law\\
 \texttt{ce\_kick\_cfl}      (op) & — & 1 & Velocity‑kick limiter\\
 \texttt{ce\_xmin}           (op) & — & $10^{-4}$ & Coulomb cutoff $x_{\min}$\\
 \texttt{ce\_Qd}             (op) & — & 0 & Geometric drag coefficient\\[0.2em]
