@@ -1,6 +1,6 @@
 %===============================================================================
 %  LaTeX  DOCUMENTATION -- v2.1 (extended, ~6 pages @ 11 pt)
-%  “roche_lobe_mass_transfer.c”  (REBOUNDx ≥ 3.12, rev. B   10 Jul 2025)
+%  “Binary‑Star Modules”  (REBOUNDx ≥ 3.12, rev. B   10 Jul 2025)
 %===============================================================================
 \documentclass[11pt]{article}
 \usepackage[a4paper,margin=2.3cm]{geometry}
@@ -22,10 +22,13 @@
 
 \begin{document}
 
-\title{\textsc{A Unified Sink Operator for Close Binary Evolution in
+\title{\textsc{Binary‑Star Evolution Modules in
          \textnormal{REBOUNDx}}:\\
-       Detailed Physical Model, Parameterisation, and Code Mapping}
-\author{Operator file: \texttt{roche\_lobe\_mass\_transfer.c}\\
+       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, and Relativity}
+\author{Operator files: \texttt{roche\_lobe\_mass\_transfer.c},
+        \texttt{magnetic\_braking.c},
+        \texttt{stellar\_wind\_mass\_loss.c},
+        \texttt{post\_newtonian.c}\\
         Revision B – 10 July 2025}
 \date{}
 \maketitle
@@ -33,35 +36,32 @@
 
 %-------------------------------------------------------------------------------
 \begin{abstract}
-We present an exhaustive documentation of the
-\texttt{roche\_lobe\_mass\_transfer} sink operator released with
-\textsc{REBOUNDx} $\ge$ 3.12 (revision B, 10 Jul 2025).  
-The routine couples four physical processes—Roche‑lobe overflow,
-non‑conservative systemic winds, common‑envelope (CE) drag, and
-quadrupolar gravitational‑wave (GW) back‑reaction—within a single,
-momentum‑conserving framework featuring adaptive sub‑stepping and robust
-merge guards.
-All implemented equations are derived, every user‑visible parameter is
-tabulated, and algorithmic choices are clarified so that the document can
-serve as an archival, citable reference.
+We document the binary‑star evolution modules distributed with
+\textsc{REBOUNDx} $\ge$ 3.12 (revision B, 10 Jul 2025).
+The Roche‑lobe mass transfer operator combines overflow, non‑conservative
+systemic winds, and common‑envelope drag within a momentum‑conserving
+framework featuring adaptive sub‑stepping and robust merge guards.
+Separate operators implement magnetic braking, isotropic stellar‑wind
+mass loss, and post‑Newtonian relativistic corrections through 2.5PN
+order.  Equations are derived, parameters are tabulated, and algorithmic
+choices are clarified so that this document can serve as an archival,
+citable reference.
 \end{abstract}
 
 %-------------------------------------------------------------------------------
 \section{Background and Motivation}
 \label{sec:intro}
-Roche‑lobe overflow (RLOF), common‑envelope evolution, and gravitational‑wave
-back‑reaction govern the orbital fates of close binaries
-\citep{Eggleton1983,Ostriker1999,Peters1964}.
-Hydrodynamic simulations capture these effects but are
-computationally prohibitive for population synthesis, while purely secular
-codes lack the fidelity needed for higher‑order dynamical systems
-(e.g.\ triples or cluster environments).
-The operator documented here bridges these regimes by injecting carefully
+Roche‑lobe overflow, common‑envelope evolution, stellar winds, magnetic
+braking, and relativistic effects govern the orbital fates of close
+binaries\citep{Eggleton1983,Ostriker1999,Peters1964}.  Hydrodynamic
+simulations capture these effects but are computationally prohibitive for
+population synthesis, while purely secular codes lack the fidelity needed
+for higher‑order dynamical systems (e.g.\ triples or cluster environments).
+The modules documented here bridge these regimes by injecting carefully
 book‑kept mass changes and dissipative forces into an otherwise
 high‑precision $N$‑body integration.
 
-Relative to earlier REBOUNDx modules
-(\texttt{reboundx\_rlmt}, \texttt{reboundx\_gw}), this version
+The Roche‑lobe mass transfer operator:
 
 \begin{itemize}[nosep,leftmargin=1.8em]
 \item tracks \emph{all} linear momentum channels to machine precision;
@@ -215,40 +215,6 @@ limits mass changes through $\Delta M/M\le\texttt{rlmt\_substep\_max\_dm}$.
 Users who require an explicit floor can modify the source accordingly.
 
 %-------------------------------------------------------------------------------
-\subsection{Gravitational‑Wave Back‑Reaction}
-\label{sec:gw}
-
-Quadrupolar GW emission follows the classic Peters equations
-\citep{Peters1964}. This step is executed only when
-\texttt{gw\_decay\_on}=1 and a positive \texttt{gw\_c} (speed of light) is
-supplied; otherwise the decay is skipped:
-\begin{align}
-\frac{da}{dt} &=
--\frac{64}{5}\,\frac{G^3M_1M_2(M_1+M_2)}{c^5a^3(1-e^2)^{7/2}}
-\Bigl(1+\tfrac{73}{24}e^2+\tfrac{37}{96}e^4\Bigr),
-\label{eq:da_dt}\\
-\frac{de}{dt} &=
--\frac{304}{15}\,e\,\frac{G^3M_1M_2(M_1+M_2)}{c^5a^4(1-e^2)^{5/2}}
-\Bigl(1+\tfrac{121}{304}e^2\Bigr).
-\label{eq:de_dt}
-\end{align}
-\noindent A first‑order Euler step updates $a$ and $e$; the eccentricity is
-clipped to $0\le e<0.999999$ and the semi‑major axis is floored at
-$\varepsilon_{\rm merge}$ to maintain finiteness. The mean anomaly is advanced
-with a trapezoidal rule
-\(
-M\gets M+\tfrac12(n_{\rm old}+n_{\rm new})\Delta t
-\)
-to achieve second‑order phase accuracy.
-
-\paragraph{Coalescence guard.}
-If the step drives the orbit below $\varepsilon_{\rm merge}$ or produces a
-non‑finite $a$, the two particles are merged immediately. No explicit
-time‑step limiter based on
-$t_{\rm GW}=|a/\dot a|$ is implemented; accuracy relies on the generic
-sub‑stepper and user‑selected global step size.
-
-%-------------------------------------------------------------------------------
 \subsection{Magnetic Braking}
 \label{sec:mb}
 
@@ -277,6 +243,57 @@ rotation rates.
 \texttt{mb\_on}=1 and has \texttt{mb\_convective}=1.  Missing parameters,
 non‑positive $I$, or vanishing spin vectors automatically disable the update.
 
+\begin{table}[h]
+\centering\footnotesize
+\caption{Magnetic braking parameters}
+\label{tab:mb}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Name (scope) & Unit & Default & Purpose \\
+\midrule
+\texttt{mb\_K} (op) & cgs & $2.7\times10^{47}$ & Braking constant $K$\\
+\texttt{mb\_on} (part) & bool & 0 & Enable magnetic braking\\
+\texttt{mb\_convective} (part) & bool & 0 & Convective‑envelope flag\\
+\texttt{mb\_omega\_sat} (part) & 1/t & $\infty$ & Saturation angular velocity\\
+\texttt{I} (part) & mass\,length$^2$ & — & Moment of inertia\\
+\texttt{Omega} (part) & 1/t & — & Spin angular frequency vector\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Stellar Wind Mass Loss}
+\label{sec:swml}
+
+Isotropic winds remove mass from single stars according to the
+Reimers prescription. For a star of mass $M$, luminosity $L$, and radius
+$R$, the mass-loss rate is
+\[
+\dot M = -4\times10^{-13}\,\eta\,\frac{L}{L_\odot}\frac{R}{R_\odot}\frac{M_\odot}{M}
+\;M_\odot\,\mathrm{yr}^{-1},
+\]
+where the dimensionless efficiency $\eta$ together with $L$ and $R$ are
+specified per particle. The prefactor and solar reference values can be
+adjusted via operator parameters (Table~\ref{tab:swml}).
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{Stellar wind mass-loss parameters}
+\label{tab:swml}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Name (scope) & Unit & Default & Purpose \\
+\midrule
+\texttt{swml\_eta} (part) & — & — & Wind efficiency $\eta$\\
+\texttt{swml\_L}   (part) & luminosity & — & Stellar luminosity $L$\\
+\texttt{swml\_R}   (part) & length & — & Stellar radius $R$\\[0.2em]
+\texttt{swml\_const} (op) & $M_\odot$/yr & $4\times10^{-13}$ & Reimers prefactor\\
+\texttt{swml\_Msun}  (op) & mass & 1 & Solar mass in code units\\
+\texttt{swml\_Rsun}  (op) & length & 1 & Solar radius in code units\\
+\texttt{swml\_Lsun}  (op) & luminosity & 1 & Solar luminosity in code units\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 %-------------------------------------------------------------------------------
 \section{Algorithmic Flow}
 
@@ -295,8 +312,6 @@ $0.5\min(R_{*},R_{\rm acc})$ when unspecified.
   \begin{enumerate}[nosep]
     \item RLOF mass exchange and momentum bookkeeping.
     \item CE drag (if inside envelope).
-    \item Magnetic braking (if enabled).
-    \item GW back‑reaction (if enabled).
     \item Secondary merge guard.
   \end{enumerate}
 \item Purge zero‑mass particles.  If either the donor or accretor vanishes,
@@ -310,8 +325,8 @@ $0.5\min(R_{*},R_{\rm acc})$ when unspecified.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Complete set of operator‐level (\textit{op}) and
-particle‑level (\textit{part}) parameters.}
+\caption{Operator-level (\textit{op}) and particle-level (\textit{part}) parameters for the
+Roche-lobe mass transfer effect.}
 \label{tab:params}
 \begin{tabular}{@{}lllll@{}}
 \toprule
@@ -341,17 +356,6 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{ce\_kick\_cfl}      (op) & — & 1 & Velocity‑kick limiter\\
 \texttt{ce\_xmin}           (op) & — & $10^{-4}$ & Coulomb cutoff $x_{\min}$\\
 \texttt{ce\_Qd}             (op) & — & 0 & Geometric drag coefficient\\[0.2em]
-%
-\texttt{gw\_c}              (op) & length/t & — & Speed of light (required)\\
-\texttt{gw\_decay\_on}      (op) & bool & 0 & Toggle GW back‑reaction\\[0.2em]
-%
-\texttt{mb\_K}             (op) & cgs & $2.7\times10^{47}$ & Braking constant $K$\\
-\texttt{mb\_on}            (part) & bool & 0 & Enable magnetic braking\\
-\texttt{mb\_convective}    (part) & bool & 0 & Convective‑envelope flag\\
-\texttt{mb\_omega\_sat}    (part) & 1/t & $\infty$ & Saturation angular velocity\\
-\texttt{I}                 (part) & mass\,length$^2$ & — & Moment of inertia\\
-\texttt{Omega}             (part) & 1/t & — & Spin angular frequency vector\\[0.2em]
-%
 \texttt{merge\_eps}         (op) & length & $0.5\min(R_*,R_{\rm acc})$ & Merge radius\\
 \bottomrule
 \end{tabular}
@@ -359,10 +363,9 @@ Name (scope) & Unit & Default & Purpose \\
 
 %-------------------------------------------------------------------------------
 \section{Post-Newtonian Relativistic Corrections}
-Beyond the quadrupolar gravitational-wave decay described above, compact binaries
-experience additional post-Newtonian forces that drive apsidal precession and
-couple the eccentricity and inclination. We provide a dedicated force
-\texttt{post\_newtonian} implementing the leading conservative $1$PN and
+Compact binaries also experience post-Newtonian forces that drive apsidal
+precession and couple the eccentricity and inclination. We provide a dedicated
+force \texttt{post\_newtonian} implementing the leading conservative $1$PN and
 dissipative $2.5$PN terms for every particle pair.
 
 For bodies with masses $m_i$ and $m_j$ separated by $\mathbf{r}$ and with
@@ -381,19 +384,18 @@ the field name \texttt{c}. Setting $c$ consistently with the simulation units
 reproduces the classical perihelion advance and gravitational-wave driven
 inspiral~\citep{Einstein1915, Peters1964, Kidder1995}.
 
-%-------------------------------------------------------------------------------
-\section{Numerical Tests}
-\label{sec:tests}
-The operator ships with a test suite (\texttt{tests/test\_rlmt\_*}):
-
-\begin{enumerate}[nosep]
-\item \textbf{CE0:} inspiral of a $1.4+0.6\,M_\odot$ companion inside a
-      $5\,M_\odot$ red‑giant envelope reproduces the hydrodynamic energy
-      budget of \citet{Fragos2019} to within $2\%$.
-\item \textbf{GW1:} a $1.4+1.4\,M_\odot$ double neutron star evolves from
-      $P_{\rm orb}=30$ min to merger; chirp mass and coalescence time agree
-      with semi‑analytic integration to $<0.5\%$.
-\end{enumerate}
+\begin{table}[h]
+\centering\footnotesize
+\caption{Post-Newtonian effect parameter}
+\label{tab:pn}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Field & Unit & Description \\
+\midrule
+\texttt{c} & length/t & Speed of light (required)\\
+\bottomrule
+\end{tabular}
+\end{table}
 
 %-------------------------------------------------------------------------------
 \section{Discussion and Future Extensions}
@@ -405,20 +407,19 @@ so that $R_*(M)$ and $H_P(M)$ evolve self‑consistently.
 
 %-------------------------------------------------------------------------------
 \section{Conclusions}
-We have brought the LaTeX documentation fully in line with the
-\texttt{C} implementation of the
-\texttt{roche\_lobe\_mass\_transfer} sink operator.
+We have brought the LaTeX documentation in line with the
+\texttt{C} implementations of the
+\texttt{roche\_lobe\_mass\_transfer}, \texttt{magnetic\_braking},
+\texttt{stellar\_wind\_mass\_loss}, and \texttt{post\_newtonian} modules.
 All physical assumptions, numerical safeguards, and run‑time parameters
 are now accurately reflected, enabling reliable use and further
-development of the module.
+development of these effects.
 
 %-------------------------------------------------------------------------------
 \bibliographystyle{plainnat}
 \begin{thebibliography}{}
 \bibitem[Eggleton(1983)]{Eggleton1983}
   Eggleton,~P.\ 1983, \emph{ApJ}, 268, 368.
-\bibitem[Fragos et~al.(2019)]{Fragos2019}
-  Fragos,~T., Andrews,~J., \& co‑authors 2019, \emph{ApJ}, 883, L45.
 \bibitem[Kawaler(1988)]{Kawaler1988}
   Kawaler,~S.~D.\ 1988, \emph{ApJ}, 333, 236.
 \bibitem[Ostriker(1999)]{Ostriker1999}
