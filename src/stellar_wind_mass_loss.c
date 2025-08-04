@@ -1,80 +1,108 @@
 /**
  * @file    stellar_wind_mass_loss.c
- * @brief   Continuous stellar wind mass loss using Reimers' law.
+ * @brief   Continuous stellar‑wind mass loss (Reimers law).
  *
- * This operator decreases a star's mass every timestep according
- * to the Reimers wind prescription
+ * Reimers (1975) prescription:
  *
- *     \dot M = -4\times10^{-13}\,\eta\,\frac{L}{L_\odot}\frac{R}{R_\odot}\frac{M_\odot}{M}\;M_\odot\,\mathrm{yr}^{-1}
+ *   dM/dt = - 4.0e-13 η (L/L☉)(R/R☉)(M/M☉)⁻¹  M☉ yr⁻¹ .
  *
- * where the user supplies the dimensionless efficiency \eta as well
- * as the stellar luminosity and radius.  All quantities should be
- * given in the same units as used in the simulation.  The constant
- * factor may be overridden via the operator parameter ``swml_const``.
+ * Operator‑level parameters
+ * -------------------------
+ *  swml_const  (double, optional)  – prefactor in M☉ yr⁻¹ (default 4e‑13)
+ *  swml_Msun   (double, optional)  – Solar mass  in code‑mass units (default 1)
+ *  swml_Rsun   (double, optional)  – Solar radius in code‑length units (default 1)
+ *  swml_Lsun   (double, optional)  – Solar luminosity in code‑lum  units (default 1)
+ *  swml_year   (double, optional)  – Length of one Julian year in code‑time
+ *                                    units (default 1 → legacy behaviour).
  *
- * **Particle Parameters**
+ * Particle‑level parameters
+ * -------------------------
+ *  swml_eta    (double, required)  – dimensionless efficiency η
+ *  swml_L      (double, required)  – stellar luminosity  (same units as Lsun)
+ *  swml_R      (double, required)  – stellar radius      (same units as Rsun)
  *
- * ============================ =========== ====================================
- * Field (C type)               Required    Description
- * ============================ =========== ====================================
- * swml_eta (double)           Yes         Wind efficiency parameter \eta
- * swml_L   (double)           Yes         Stellar luminosity
- * swml_R   (double)           Yes         Stellar radius
- * ============================ =========== ====================================
- *
- * **Operator Parameters**
- *
- * ============================ =========== ====================================
- * Field (C type)               Required    Description
- * ============================ =========== ====================================
- * swml_const (double)          No          Prefactor in Msun/yr (default 4e-13)
- * swml_Msun  (double)          No          Solar mass in code units (default 1)
- * swml_Rsun  (double)          No          Solar radius in code units (default 1)
- * swml_Lsun  (double)          No          Solar luminosity in code units (default 1)
- * ============================ =========== ====================================
+ * Notes
+ * -----
+ * * The operator is *unit agnostic* as long as you set the scaling
+ *   parameters consistently.
+ * * Mass is removed isotropically; no linear‑momentum recoil is applied.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
 #include <math.h>
 #include "rebound.h"
 #include "reboundx.h"
 
-void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt){
-    struct rebx_extras* const rebx = sim->extras;
-    const int N_real = sim->N - sim->N_var;
+/* ------------------------------------------------------------------------- */
+/* Operator kernel                                                           */
+/* ------------------------------------------------------------------------- */
+void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
+                                 struct rebx_operator*  const op,
+                                 const double                 dt)
+{
+    if (dt <= 0.0 || !isfinite(dt)) return;
 
-    double Msun = 1.;
-    double Rsun = 1.;
-    double Lsun = 1.;
-    double constant = 4e-13; // default Msun/yr
+    struct rebx_extras* const rx = sim->extras;
+    const int N_real = sim->N - sim->N_var;          /* ignore virtuals       */
 
-    const double* Msun_ptr = rebx_get_param(rebx, operator->ap, "swml_Msun");
-    const double* Rsun_ptr = rebx_get_param(rebx, operator->ap, "swml_Rsun");
-    const double* Lsun_ptr = rebx_get_param(rebx, operator->ap, "swml_Lsun");
-    const double* const_ptr = rebx_get_param(rebx, operator->ap, "swml_const");
-    if (Msun_ptr) Msun = *Msun_ptr;
-    if (Rsun_ptr) Rsun = *Rsun_ptr;
-    if (Lsun_ptr) Lsun = *Lsun_ptr;
-    if (const_ptr) constant = *const_ptr;
+    /* --------------------- operator‑level parameters -------------------- */
+    double Msun     = 1.0;    /* code‑mass units per solar mass             */
+    double Rsun     = 1.0;    /* code‑length units per solar radius         */
+    double Lsun     = 1.0;    /* code‑lum   units per solar luminosity      */
+    double C0       = 4.0e-13;/* base prefactor [M☉ yr⁻¹]                   */
+    double year_len = 1.0;    /* code‑time units per Julian year            */
 
-    for (int i=0; i<N_real; i++){
+    const double* pM  = rebx_get_param(rx, op->ap, "swml_Msun");
+    const double* pR  = rebx_get_param(rx, op->ap, "swml_Rsun");
+    const double* pL  = rebx_get_param(rx, op->ap, "swml_Lsun");
+    const double* pC  = rebx_get_param(rx, op->ap, "swml_const");
+    const double* pYr = rebx_get_param(rx, op->ap, "swml_year");
+
+    if (pM  && isfinite(*pM ) && *pM  > 0.0) Msun     = *pM;
+    if (pR  && isfinite(*pR ) && *pR  > 0.0) Rsun     = *pR;
+    if (pL  && isfinite(*pL ) && *pL  > 0.0) Lsun     = *pL;
+    if (pC  && isfinite(*pC ) && *pC  > 0.0) C0       = *pC;
+    if (pYr && isfinite(*pYr) && *pYr > 0.0) year_len = *pYr;
+
+    /* Prefactor converted to *code‑mass per code‑time* */
+    const double pref = (C0 * Msun) / year_len;      /* [code‑mass / code‑time] */
+
+    /* --------------------- loop over genuine particles ------------------ */
+    for (int i = 0; i < N_real; i++){
         struct reb_particle* const p = &sim->particles[i];
-        const double* eta_ptr = rebx_get_param(rebx, p->ap, "swml_eta");
-        const double* L_ptr   = rebx_get_param(rebx, p->ap, "swml_L");
-        const double* R_ptr   = rebx_get_param(rebx, p->ap, "swml_R");
-        if (eta_ptr && L_ptr && R_ptr){
-            if (p->m <= 0.) continue;
-            const double eta = *eta_ptr;
-            const double L   = *L_ptr;
-            const double R   = *R_ptr;
-            double mdot = -constant * eta * (L/Lsun) * (R/Rsun) / (p->m/Msun); // Msun/yr
-            double dM = mdot * dt;
-            if (p->m + dM <= 0.){
-                dM = -p->m;
-            }
+
+        /* Fetch particle parameters */
+        const double* eta_ptr = rebx_get_param(rx, p->ap, "swml_eta");
+        const double* L_ptr   = rebx_get_param(rx, p->ap, "swml_L");
+        const double* R_ptr   = rebx_get_param(rx, p->ap, "swml_R");
+
+        if (!eta_ptr || !L_ptr || !R_ptr) continue;
+
+        const double eta = *eta_ptr;
+        const double L   = *L_ptr;
+        const double R   = *R_ptr;
+
+        /* Sanity checks */
+        if (!isfinite(eta) || eta <= 0.0) continue;
+        if (!isfinite(L)   || L   <= 0.0) continue;
+        if (!isfinite(R)   || R   <= 0.0) continue;
+        if (p->m <= 0.0 || !isfinite(p->m)) continue;
+
+        /* Reimers mass‑loss rate in code units */
+        const double mdot = -pref * eta
+                            * (L / Lsun)
+                            * (R / Rsun)
+                            * (Msun / p->m);     /* [code‑mass / code‑time] */
+
+        const double dM = mdot * dt;             /* negative number         */
+
+        /* Prevent negative masses */
+        if (p->m + dM <= 0.0) {
+            p->m = 0.0;
+        } else {
             p->m += dM;
         }
     }
+
+    /* Recentre: mass distribution changed */
     reb_simulation_move_to_com(sim);
 }
