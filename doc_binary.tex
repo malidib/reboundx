@@ -149,14 +149,16 @@ The donor receives the opposite kick scaled by $M_{\mathrm a}/M_{\mathrm d}$ so
 that linear momentum remains conserved.
 
 \paragraph{Donor radius evolution (optional).}
-If the donor carries attributes
-\texttt{rlmt\_R\_slope}, \texttt{rlmt\_R\_ref\_mass},
-\texttt{rlmt\_R\_ref\_radius}, its radius is updated via the power‑law
+If the donor supplies a non-zero \texttt{rlmt\_R\_slope}, its radius is updated
+after each sub-step according to the power law
 \[
 R_{\mathrm d}(M)=R_{\mathrm ref}
 \left(\frac{M}{M_{\mathrm ref}}\right)^{\alpha_R},
 \]
-enabling adiabatic or thermally driven mass‑radius responses.
+where $\alpha_R$ is \texttt{rlmt\_R\_slope}. The reference values
+\texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to the
+donor's initial mass and radius if not provided. This enables adiabatic or
+thermally driven mass–radius responses.
 
 %-------------------------------------------------------------------------------
 \subsection{Common–Envelope (CE) Dynamical Friction}
@@ -189,8 +191,8 @@ $\ln(1/x_{\min})$,
 ensuring $I(\mathcal M)\le\ln(1/x_{\min})$ in \emph{all} regimes.
 
 \paragraph{Hydrodynamic accretion term (optional).}
-If \texttt{ce\_Qd}$>$0,
-a Bondi–Hoyle‐like contribution
+If \texttt{ce\_Qd}$>$0 and the accretor's radius $R_{\mathrm acc}$ (taken from its
+\texttt{r} field) is positive, a Bondi–Hoyle–like contribution
 \[
 \mathbf a_{\rm GM}
 =-\frac{\pi\,\rho\,R_{\mathrm acc}^2\,v_{\rm rel}\,Q_d}{M_{\mathrm a}}
@@ -393,8 +395,10 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{rlmt\_R\_ref\_mass}  (part) & mass  & $M_{\rm init}$ & Reference mass $M_{\rm ref}$\\
 \texttt{rlmt\_R\_ref\_radius}(part) & length& $R_{\rm init}$ & Reference radius $R_{\rm ref}$\\[0.2em]
 %
-\texttt{ce\_rho0}, \texttt{ce\_cs}  (op) & cgs & — & Power‑law normalisations\\
-\texttt{ce\_alpha\_rho}, \texttt{ce\_alpha\_cs} (op) & — & 0 & Power‑law slopes\\
+\texttt{ce\_rho0}       (op) & density & — & Envelope density normalisation\\
+\texttt{ce\_cs}         (op) & speed   & — & Sound-speed normalisation\\
+\texttt{ce\_alpha\_rho}(op) & —       & 0 & Density power-law slope\\
+\texttt{ce\_alpha\_cs} (op) & —       & 0 & Sound-speed power-law slope\\
 \texttt{ce\_profile\_file}  (op) & path & — & ASCII $(s,\rho,c_s)$ profile, overrides power law\\
 \texttt{ce\_kick\_cfl}      (op) & — & 1 & Velocity‑kick limiter\\
 \texttt{ce\_xmin}           (op) & — & $10^{-4}$ & Coulomb cutoff $x_{\min}$\\
