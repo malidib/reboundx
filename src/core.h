@@ -90,6 +90,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx
 void rebx_integrate_force(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_modify_orbits_direct(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_track_min_distance(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
+void rebx_magnetic_braking(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 
 /****************************************
  Integrator prototypes
