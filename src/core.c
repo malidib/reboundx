@@ -453,6 +453,10 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
         operator->step_function = rebx_stellar_wind_mass_loss;
         operator->operator_type = REBX_OPERATOR_UPDATER;
     }
+    else if (strcmp(name, "thermally_driven_winds") == 0){
+        operator->step_function = rebx_thermally_driven_winds;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
     else if (strcmp(name, "stellar_evolution_sse") == 0){
         operator->step_function = rebx_stellar_evolution_sse;
         operator->operator_type = REBX_OPERATOR_UPDATER;
@@ -781,6 +785,10 @@ void* rebx_get_param(struct rebx_extras* const rebx, struct rebx_node* ap, const
     else{
         return param->value;
     }
+}
+
+struct reb_vec3d* rebx_get_param_vec(struct rebx_extras* const rebx, struct rebx_node* ap, const char* const param_name){
+    return (struct reb_vec3d*)rebx_get_param(rebx, ap, param_name);
 }
 
 struct rebx_force* rebx_get_force(struct rebx_extras* const rebx, const char* const name){

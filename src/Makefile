@@ -23,7 +23,7 @@ ifndef REBXGITHASH
 endif
 
 
-SOURCES=tides_spin.c integrator_euler.c exponential_migration.c integrator_rk4.c gravitational_harmonics.c integrator_rk2.c linkedlist.c type_I_migration.c interpolation.c track_min_distance.c stellar_evolution_sse.c radiation_forces.c stochastic_forces.c output.c core.c modify_orbits_direct.c modify_orbits_forces.c stellar_wind_mass_loss.c integrate_force.c modify_mass.c integrator_implicit_midpoint.c rebxtools.c steppers.c gr_full.c input.c gas_damping_timescale.c inner_disk_edge.c gr_potential.c yarkovsky_effect.c gas_dynamical_friction.c lense_thirring.c roche_lobe_mass_transfer.c tides_constant_time_lag.c gr.c central_force.c magnetic_braking.c post_newtonian.c
+SOURCES=tides_spin.c integrator_euler.c exponential_migration.c integrator_rk4.c gravitational_harmonics.c integrator_rk2.c linkedlist.c type_I_migration.c interpolation.c track_min_distance.c stellar_evolution_sse.c radiation_forces.c stochastic_forces.c output.c core.c modify_orbits_direct.c modify_orbits_forces.c stellar_wind_mass_loss.c thermally_driven_winds.c integrate_force.c modify_mass.c integrator_implicit_midpoint.c rebxtools.c steppers.c gr_full.c input.c gas_damping_timescale.c inner_disk_edge.c gr_potential.c yarkovsky_effect.c gas_dynamical_friction.c lense_thirring.c roche_lobe_mass_transfer.c tides_constant_time_lag.c gr.c central_force.c magnetic_braking.c post_newtonian.c
 
 
 OBJECTS=$(SOURCES:.c=.o)

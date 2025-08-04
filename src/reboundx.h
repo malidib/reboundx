@@ -416,6 +416,7 @@ int rebx_remove_param(struct rebx_node** apptr, const char* const param_name);
  */
 
 void* rebx_get_param(struct rebx_extras* const rebx, struct rebx_node* ap, const char* const param_name);
+struct reb_vec3d* rebx_get_param_vec(struct rebx_extras* const rebx, struct rebx_node* ap, const char* const param_name);
 struct rebx_param* rebx_get_param_struct(struct rebx_extras* const rebx, struct rebx_node* ap, const char* const param_name);
 void rebx_set_param_pointer(struct rebx_extras* const rebx, struct rebx_node** apptr, const char* const param_name, void* val);
 void rebx_set_param_double(struct rebx_extras* const rebx, struct rebx_node** apptr, const char* const param_name, double val);
