@@ -870,3 +870,41 @@ min_distance_orbit (reb_orbit)   No          Parameter to store orbital elements
 ================================ =========== =======================================================
 
 
+
+.. _magnetic_braking:
+
+magnetic_braking
+*****************
+
+======================= ===============================================
+Authors                 REBOUNDx team
+Implementation Paper    Verbunt & Zwaan 1981; Kawaler 1988
+======================= ===============================================
+
+Applies a spin-down torque to cool stars following the Verbunt-Zwaan/
+Kawaler magnetic braking law with saturation. The torque is applied
+anti-parallel to the current spin vector, reducing the spin angular
+momentum so that preceding tidal operators can self-consistently
+transfer angular momentum to the orbit.
+
+**Effect Parameters**
+
+============================ =========== ==================================
+Field (C type)               Required    Description
+============================ =========== ==================================
+mb_K (double)                No          Braking constant.
+============================ =========== ==================================
+
+**Particle Parameters**
+
+============================ =========== ==================================
+Field (C type)               Required    Description
+============================ =========== ==================================
+mb_on (int)                  Yes         Enable magnetic braking on particle.
+mb_convective (int)          Yes         Particle has a convective envelope.
+mb_omega_sat (double)        No          Saturation angular velocity.
+I (double)                   Yes         Moment of inertia.
+Omega (reb_vec3d)            Yes         Spin angular frequency vector.
+============================ =========== ==================================
+
+

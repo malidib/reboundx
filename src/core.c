@@ -182,6 +182,10 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "sse_R_exp", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_L_coeff", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_L_exp", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_on", REBX_TYPE_INT);
+    rebx_register_param(rebx, "mb_convective", REBX_TYPE_INT);
+    rebx_register_param(rebx, "mb_omega_sat", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_K", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
@@ -453,6 +457,10 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
     }
     else if (strcmp(name, "roche_lobe_mass_transfer") == 0){
         operator->step_function = rebx_roche_lobe_mass_transfer;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
+    else if (strcmp(name, "magnetic_braking") == 0){
+        operator->step_function = rebx_magnetic_braking;
         operator->operator_type = REBX_OPERATOR_UPDATER;
     }
     else if (strcmp(name, "integrate_force") == 0){
