@@ -24,10 +24,12 @@
 
 \title{\textsc{Binary‑Star Evolution Modules in
          \textnormal{REBOUNDx}}:\\
-       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, and Relativity}
+       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, Simplified
+       Stellar Evolution, and Relativity}
 \author{Operator files: \texttt{roche\_lobe\_mass\_transfer.c},
         \texttt{magnetic\_braking.c},
         \texttt{stellar\_wind\_mass\_loss.c},
+        \texttt{stellar\_evolution\_sse.c},
         \texttt{post\_newtonian.c}\\
         Revision B – 10 July 2025}
 \date{}
@@ -42,8 +44,9 @@ The Roche‑lobe mass transfer operator combines overflow, non‑conservative
 systemic winds, and common‑envelope drag within a momentum‑conserving
 framework featuring adaptive sub‑stepping and robust merge guards.
 Separate operators implement magnetic braking, isotropic stellar‑wind
-mass loss, and post‑Newtonian relativistic corrections through 2.5PN
-order.  Equations are derived, parameters are tabulated, and algorithmic
+mass loss, simplified stellar‑evolution scalings, and post‑Newtonian
+relativistic corrections through 2.5PN order.  Equations are derived,
+parameters are tabulated, and algorithmic
 choices are clarified so that this document can serve as an archival,
 citable reference.
 \end{abstract}
@@ -51,9 +54,10 @@ citable reference.
 %-------------------------------------------------------------------------------
 \section{Background and Motivation}
 \label{sec:intro}
-Roche‑lobe overflow, common‑envelope evolution, stellar winds, magnetic
-braking, and relativistic effects govern the orbital fates of close
-binaries\citep{Eggleton1983,Ostriker1999,Peters1964}.  Hydrodynamic
+Roche‑lobe overflow, common‑envelope evolution, stellar winds,
+magnetic braking, simplified stellar evolution, and relativistic effects
+govern the orbital fates of close binaries\citep{Eggleton1983,Ostriker1999,
+Peters1964,Reimers1975,Verbunt1981,Kawaler1988,Hurley2000}.  Hydrodynamic
 simulations capture these effects but are computationally prohibitive for
 population synthesis, while purely secular codes lack the fidelity needed
 for higher‑order dynamical systems (e.g.\ triples or cluster environments).
@@ -118,11 +122,12 @@ A user‑set fraction $f_{\mathrm loss}\in[0,1]$ escapes as a wind,
 Four prescriptions can be selected at run time:
 \begin{subequations}\label{eq:joptions}
 \begin{align}
-\mathbf v_{\mathrm loss} &= \mathbf v_{\mathrm d} & (\text{mode }0)\\
-                         &= \mathbf v_{\mathrm a} & (\text{mode }1)\\
-                         &= \mathbf v_{\mathrm cm}& (\text{mode }2)\\
-                         &= \mathbf v_{\mathrm d} + f_j\,\mathbf e_\perp
-                            \frac{j_{\rm orb}}{\lvert\mathbf r\rvert} & (\text{mode }3),
+\mathbf v_{\mathrm{loss}} &= \mathbf v_{\mathrm d} && (\text{mode }0)\\
+                            &= \mathbf v_{\mathrm a} && (\text{mode }1)\\
+                            &= \frac{M_{\mathrm d}\,\mathbf v_{\mathrm d}+M_{\mathrm a}\,\mathbf v_{\mathrm a}}
+                               {M_{\mathrm d}+M_{\mathrm a}} && (\text{mode }2)\\
+                            &= \mathbf v_{\mathrm d} + f_j\,\mathbf e_\perp
+                               \frac{j_{\rm orb}}{r} && (\text{mode }3),
 \end{align}
 \end{subequations}
 where $\mathbf e_\perp$ is any unit vector orthogonal to the separation
@@ -299,6 +304,39 @@ Name (scope) & Unit & Default & Purpose \\
 \end{tabular}
 \end{table}
 
+\subsection{Simplified Stellar Evolution}
+\label{sec:sse}
+
+To supply mass-dependent stellar properties the optional
+\texttt{stellar\_evolution\_sse} operator updates each star's radius and
+luminosity using power-law scalings inspired by \citet{Hurley2000}. For a
+particle of mass $M$ (in $M_\odot$) we set
+\[
+R = R_{\rm coeff} R_\odot \left(\frac{M}{M_\odot}\right)^{R_{\rm exp}},\qquad
+L = L_{\rm coeff} L_\odot \left(\frac{M}{M_\odot}\right)^{L_{\rm exp}}.
+\]
+The particle's radius field is replaced by $R$, and the values $R$ and $L$
+are written to the attributes \texttt{swml\_R} and \texttt{swml\_L} so that
+the wind-mass-loss operator can consume them.
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{Simplified stellar-evolution parameters}
+\label{tab:sse}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Name (scope) & Unit & Default & Purpose \\
+\midrule
+\texttt{sse\_Rsun}   (op) & length     & 1   & Solar radius in code units\\
+\texttt{sse\_Lsun}   (op) & luminosity & 1   & Solar luminosity in code units\\
+\texttt{sse\_R\_coeff} (op) & —       & 1   & Radius scaling prefactor\\
+\texttt{sse\_R\_exp}   (op) & —       & 0.8 & Radius mass exponent\\
+\texttt{sse\_L\_coeff} (op) & —       & 1   & Luminosity scaling prefactor\\
+\texttt{sse\_L\_exp}   (op) & —       & 3.5 & Luminosity mass exponent\\
+\bottomrule
+\end{tabular}
+\end{table}
+
 %-------------------------------------------------------------------------------
 \section{Algorithmic Flow}
 
@@ -325,7 +363,7 @@ $0.5\min(R_{*},R_{\rm acc})$ when unspecified.
 \end{enumerate}
 
 %-------------------------------------------------------------------------------
-\section{Run‑Time Parameters}
+\section{Run‑Time Parameters for Roche‑Lobe Transfer}
 \label{sec:param_table}
 
 \begin{table}[h]
@@ -418,7 +456,8 @@ so that $R_*(M)$ and $H_P(M)$ evolve self‑consistently.
 We have brought the LaTeX documentation in line with the
 \texttt{C} implementations of the
 \texttt{roche\_lobe\_mass\_transfer}, \texttt{magnetic\_braking},
-\texttt{stellar\_wind\_mass\_loss}, and \texttt{post\_newtonian} modules.
+\texttt{stellar\_wind\_mass\_loss}, \texttt{stellar\_evolution\_sse}, and
+\texttt{post\_newtonian} modules.
 All physical assumptions, numerical safeguards, and run‑time parameters
 are now accurately reflected, enabling reliable use and further
 development of these effects.
@@ -430,6 +469,8 @@ development of these effects.
   Eggleton,~P.\ 1983, \emph{ApJ}, 268, 368.
 \bibitem[Kawaler(1988)]{Kawaler1988}
   Kawaler,~S.~D.\ 1988, \emph{ApJ}, 333, 236.
+\bibitem[Reimers(1975)]{Reimers1975}
+  Reimers,~D.\ 1975, \emph{Mem.\ Soc.\ R.\ Sci.\ Li\`ege}, 8, 369.
 \bibitem[Ostriker(1999)]{Ostriker1999}
   Ostriker,~E.\ 1999, \emph{ApJ}, 513, 252.
 \bibitem[Peters(1964)]{Peters1964}
@@ -442,6 +483,8 @@ development of these effects.
   Ritter,~H.\ 1988, \emph{A\&A}, 202, 93.
 \bibitem[Verbunt \& Zwaan(1981)]{Verbunt1981}
   Verbunt,~F. \& Zwaan,~C.\ 1981, \emph{A\&A}, 100, L7.
+\bibitem[Hurley et~al.(2000)]{Hurley2000}
+  Hurley,~J.~R., Pols,~O.~R., \& Tout,~C.~A.\ 2000, \emph{MNRAS}, 315, 543.
 \end{thebibliography}
 
 \end{document}
