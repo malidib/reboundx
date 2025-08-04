@@ -1,84 +1,98 @@
 /**
  * @file    magnetic_braking.c
- * @brief   Spin down cool stars via magnetic braking.
+ * @brief   Verbunt–Zwaan / Kawaler magnetic‑braking torque with saturation.
  *
- * Implements a Verbunt-Zwaan / Kawaler type magnetic braking law
- * with saturation.  The braking torque is applied anti-parallel
- * to the current spin vector of any particle that has ``mb_on``
- * set in its additional parameters and a non-zero ``mb_convective``
- * flag.  The star's spin vector ``Omega`` is updated directly and
- * tidal coupling may subsequently transfer the removed angular
- * momentum to the orbit.
+ * dJ/dt = -K R^{1/2} M^{-1/2} ×
+ *         { Ω^3                     , Ω ≤ Ω_sat
+ *         { Ω Ω_sat^2              , Ω > Ω_sat
  *
- * **Particle parameters**
+ * where K, R, M are in consistent units.
  *
- * ============================ =========== =====================================
- * Field (C type)               Required    Description
- * ============================ =========== =====================================
- * mb_on (int)                  Yes         Enable magnetic braking for particle.
- * mb_convective (int)          Yes         Flag indicating a convective envelope.
- * mb_omega_sat (double)        No          Saturation angular velocity.
- * I (double)                   Yes         Moment of inertia of the star.
- * Omega (reb_vec3d)            Yes         Spin angular frequency vector.
- * ============================ =========== =====================================
+ * Particle‑level parameters  (all scalars are stored as double in REBOUNDx)
+ * ------------------------------------------------------------------------
+ * mb_on          (double, required ≠0)  – enable braking on this particle
+ * mb_convective  (double, required ≠0)  – star has a convective envelope
+ * mb_omega_sat   (double, optional)     – saturation angular velocity
+ * I              (double, required)     – moment of inertia
+ * Omega          (reb_vec3d, required)  – spin angular‑velocity vector
  *
- * **Operator parameters**
+ * Operator‑level parameters
+ * -------------------------
+ * mb_K           (double, optional)     – braking constant (default 2.7e47 cgs)
  *
- * ============================ =========== =====================================
- * Field (C type)               Required    Description
- * ============================ =========== =====================================
- * mb_K (double)                No          Braking constant K (default 2.7e47).
- * ============================ =========== =====================================
+ * NOTE:  K assumes R and M are supplied in the same units used to calibrate K.
+ *        If your simulation units differ, rescale mb_K accordingly.
  */
 
 #include <math.h>
 #include "rebound.h"
 #include "reboundx.h"
 
-void rebx_magnetic_braking(struct reb_simulation* const sim,
-                            struct rebx_operator* const op,
-                            const double dt){
-    struct rebx_extras* const rebx = sim->extras;
-    const int N = sim->N;  // operate over all particles
+static inline void apply_magnetic_brake(struct reb_particle*    const p,
+                                        struct rebx_extras*     const rx,
+                                        const double            K,
+                                        const double            dt)
+{
+    /* ----------------------- fetch flags & properties ------------------- */
+    const double* mb_on  = rebx_get_param(rx, p->ap, "mb_on");
+    if (!mb_on || *mb_on == 0.0) return;
 
-    const double* K_ptr = rebx_get_param(rebx, op->ap, "mb_K");
-    const double K = K_ptr ? *K_ptr : 2.7e47;  // user-specified constant
+    const double* conv   = rebx_get_param(rx, p->ap, "mb_convective");
+    if (!conv || *conv == 0.0) return;
 
-    for(int i=0; i<N; i++){
-        struct reb_particle* p = &sim->particles[i];
+    double* I_ptr = rebx_get_param(rx, p->ap, "I");
+    if (!I_ptr || *I_ptr <= 0.0 || !isfinite(*I_ptr)) return;
 
-        const int* on_ptr  = rebx_get_param(rebx, p->ap, "mb_on");
-        const int* conv_ptr = rebx_get_param(rebx, p->ap, "mb_convective");
-        if(on_ptr == NULL || *on_ptr == 0) continue;
-        if(conv_ptr == NULL || *conv_ptr == 0) continue;
+    struct reb_vec3d* Omega = rebx_get_param_vec(rx, p->ap, "Omega");
+    if (!Omega) return;
 
-        double* I_ptr = rebx_get_param(rebx, p->ap, "I");
-        struct reb_vec3d* Omega = rebx_get_param(rebx, p->ap, "Omega");
-        if(I_ptr == NULL || Omega == NULL) continue;
-        if(*I_ptr <= 0.) continue;
+    const double R = p->r;
+    const double M = p->m;
+    if (R <= 0.0 || M <= 0.0 || !isfinite(R) || !isfinite(M)) return;
 
-        const double R = p->r;
-        const double M = p->m;
-        if(R <= 0. || M <= 0.) continue;
+    const double omega = sqrt(Omega->x*Omega->x + Omega->y*Omega->y + Omega->z*Omega->z);
+    if (!isfinite(omega) || omega == 0.0) return;
 
-        const double omega = sqrt(Omega->x*Omega->x + Omega->y*Omega->y + Omega->z*Omega->z);
-        if(!isfinite(omega) || omega == 0.) continue;
+    const double* sat_ptr   = rebx_get_param(rx, p->ap, "mb_omega_sat");
+    const double  omega_sat = (sat_ptr && *sat_ptr > 0.0 && isfinite(*sat_ptr))
+                              ? *sat_ptr : INFINITY;
 
-        const double* sat_ptr = rebx_get_param(rebx, p->ap, "mb_omega_sat");
-        const double omega_sat = sat_ptr ? *sat_ptr : INFINITY;
+    /* --------------------------- torque magnitude ----------------------- */
+    double omega_term = omega*omega*omega;          /* unsaturated default  */
+    if (omega > omega_sat)                          /* saturated regime     */
+        omega_term = omega * omega_sat * omega_sat;
 
-        double omega_term = omega*omega*omega;
-        if(omega > omega_sat){
-            omega_term = omega * omega_sat * omega_sat;  // saturated regime
-        }
+    const double torque = -K * sqrt(R) * (1.0 / sqrt(M)) * omega_term;  /* cgs‑like */
 
-        // Verbunt-Zwaan / Kawaler braking torque (anti-parallel to spin)
-        const double torque = -K * pow(R,0.5) * pow(M,-0.5) * omega_term;
+    /* --------------------------- apply dΩ/dt ---------------------------- */
+    const double domega_dt = torque / (*I_ptr);     /* scalar rate (negative) */
+    const double scale     = 1.0 + (domega_dt / omega)*dt;
 
-        const double fac = torque / (*I_ptr * omega); // dOmega/dt along -Omega_hat
-        Omega->x += fac * Omega->x * dt;
-        Omega->y += fac * Omega->y * dt;
-        Omega->z += fac * Omega->z * dt;
-    }
+    /* Prevent overshoot that could flip the spin */
+    if (scale <= 0.0) return;
+
+    Omega->x *= scale;
+    Omega->y *= scale;
+    Omega->z *= scale;
 }
 
+/* ------------------------------------------------------------------------- */
+/* Operator kernel                                                           */
+/* ------------------------------------------------------------------------- */
+void rebx_magnetic_braking(struct reb_simulation* const sim,
+                           struct rebx_operator*   const op,
+                           const double                   dt)
+{
+    struct rebx_extras* const rx = sim->extras;
+    const int N = sim->N;
+
+    const double* K_ptr = rebx_get_param(rx, op->ap, "mb_K");
+    const double  K     = (K_ptr && isfinite(*K_ptr) && *K_ptr > 0.0)
+                          ? *K_ptr : 2.7e47;      /* default from literature */
+
+    if (dt <= 0.0 || !isfinite(dt)) return;
+
+    for (int i = 0; i < N; i++){
+        apply_magnetic_brake(&sim->particles[i], rx, K, dt);
+    }
+}
