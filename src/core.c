@@ -358,6 +358,10 @@ struct rebx_force* rebx_load_force(struct rebx_extras* const rebx, const char* n
         force->update_accelerations = rebx_gr_potential;
         force->force_type = REBX_FORCE_POS;
     }
+    else if (strcmp(name, "post_newtonian") == 0){
+        force->update_accelerations = rebx_post_newtonian;
+        force->force_type = REBX_FORCE_VEL;
+    }
     else if (strcmp(name, "radiation_forces") == 0){
         force->update_accelerations = rebx_radiation_forces;
         force->force_type = REBX_FORCE_VEL;
