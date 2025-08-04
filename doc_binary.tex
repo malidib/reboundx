@@ -249,6 +249,35 @@ $t_{\rm GW}=|a/\dot a|$ is implemented; accuracy relies on the generic
 sub‑stepper and user‑selected global step size.
 
 %-------------------------------------------------------------------------------
+\subsection{Magnetic Braking}
+\label{sec:mb}
+
+Low‑mass stars with convective envelopes lose spin angular momentum through
+magnetised winds.  The implementation follows the Verbunt–Zwaan and Kawaler
+torque law \citep{Verbunt1981,Kawaler1988}, applying a braking torque
+antiparallel to the star's spin vector.
+
+\paragraph{Torque law.} For a star of mass $M$, radius $R$, and angular
+velocity $\omega = |\bm\Omega|$, the spin‑down torque is
+\begin{equation}
+\tau = -K R^{1/2} M^{-1/2} \omega^3,
+\label{eq:mb_torque}
+\end{equation}
+where $K$ is a user‑set normalisation (parameter \texttt{mb\_K}, default
+$2.7\times10^{47}$ in cgs).  The torque modifies the spin by
+$\dot{\bm\Omega}=\tau\,\bm\Omega/(I\,\omega)$ with $I$ the particle's moment
+of inertia.
+
+\paragraph{Saturation.} If a particle specifies a saturation threshold
+\texttt{mb\_omega\_sat} and $\omega>\omega_{\rm sat}$, the cubic dependence is
+replaced with $\omega\,\omega_{\rm sat}^2$, yielding a constant torque at high
+rotation rates.
+
+\paragraph{Activation.} Magnetic braking is applied only when a particle sets
+\texttt{mb\_on}=1 and has \texttt{mb\_convective}=1.  Missing parameters,
+non‑positive $I$, or vanishing spin vectors automatically disable the update.
+
+%-------------------------------------------------------------------------------
 \section{Algorithmic Flow}
 
 Each operator call subdivides the requested time span into at least
@@ -266,6 +295,7 @@ $0.5\min(R_{*},R_{\rm acc})$ when unspecified.
   \begin{enumerate}[nosep]
     \item RLOF mass exchange and momentum bookkeeping.
     \item CE drag (if inside envelope).
+    \item Magnetic braking (if enabled).
     \item GW back‑reaction (if enabled).
     \item Secondary merge guard.
   \end{enumerate}
@@ -315,6 +345,13 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{gw\_c}              (op) & length/t & — & Speed of light (required)\\
 \texttt{gw\_decay\_on}      (op) & bool & 0 & Toggle GW back‑reaction\\[0.2em]
 %
+\texttt{mb\_K}             (op) & cgs & $2.7\times10^{47}$ & Braking constant $K$\\
+\texttt{mb\_on}            (part) & bool & 0 & Enable magnetic braking\\
+\texttt{mb\_convective}    (part) & bool & 0 & Convective‑envelope flag\\
+\texttt{mb\_omega\_sat}    (part) & 1/t & $\infty$ & Saturation angular velocity\\
+\texttt{I}                 (part) & mass\,length$^2$ & — & Moment of inertia\\
+\texttt{Omega}             (part) & 1/t & — & Spin angular frequency vector\\[0.2em]
+%
 \texttt{merge\_eps}         (op) & length & $0.5\min(R_*,R_{\rm acc})$ & Merge radius\\
 \bottomrule
 \end{tabular}
@@ -338,9 +375,8 @@ The operator ships with a test suite (\texttt{tests/test\_rlmt\_*}):
 \section{Discussion and Future Extensions}
 \label{sec:future}
 Future work may add
-(i) donor magnetic‑braking torques,
-(ii) thermally driven winds, and
-(iii) direct coupling to tabulated stellar‑evolution tracks
+(i) thermally driven winds and
+(ii) direct coupling to tabulated stellar‑evolution tracks
 so that $R_*(M)$ and $H_P(M)$ evolve self‑consistently.
 
 %-------------------------------------------------------------------------------
@@ -359,12 +395,16 @@ development of the module.
   Eggleton,~P.\ 1983, \emph{ApJ}, 268, 368.
 \bibitem[Fragos et~al.(2019)]{Fragos2019}
   Fragos,~T., Andrews,~J., \& co‑authors 2019, \emph{ApJ}, 883, L45.
+\bibitem[Kawaler(1988)]{Kawaler1988}
+  Kawaler,~S.~D.\ 1988, \emph{ApJ}, 333, 236.
 \bibitem[Ostriker(1999)]{Ostriker1999}
   Ostriker,~E.\ 1999, \emph{ApJ}, 513, 252.
 \bibitem[Peters(1964)]{Peters1964}
   Peters,~P.\ 1964, \emph{Phys.\ Rev.}, 136, B1224.
 \bibitem[Ritter(1988)]{Ritter1988}
   Ritter,~H.\ 1988, \emph{A\&A}, 202, 93.
+\bibitem[Verbunt \& Zwaan(1981)]{Verbunt1981}
+  Verbunt,~F. \& Zwaan,~C.\ 1981, \emph{A\&A}, 100, L7.
 \end{thebibliography}
 
 \end{document}
