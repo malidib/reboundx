@@ -156,10 +156,13 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
             double Sdot = Si.x*Sj.x + Si.y*Sj.y + Si.z*Sj.z;
             double nidSi = nx*Si.x + ny*Si.y + nz*Si.z;
             double nidSj = nx*Sj.x + ny*Sj.y + nz*Sj.z;
-            const double prefSS = 3*G*G/(5.*c*c*c*c*mu)*invr2*invr2;
-            ax += -prefSS*( Sdot*nx + nidSj*Si.x + nidSi*Sj.x - 5*nidSi*nidSj*nx );
-            ay += -prefSS*( Sdot*ny + nidSj*Si.y + nidSi*Sj.y - 5*nidSi*nidSj*ny );
-            az += -prefSS*( Sdot*nz + nidSj*Si.z + nidSi*Sj.z - 5*nidSi*nidSj*nz );
+            const double prefSS = 3*G/(c*c*c*c)*invr2*invr2;
+            double invm_i = 1.0/pi->m;
+            double invm_j = 1.0/pj->m;
+            double common = (Sdot - 5.*nidSi*nidSj)*invm_i*invm_j;
+            ax += -prefSS*( common*nx + nidSj*Si.x*invm_i + nidSi*Sj.x*invm_j );
+            ay += -prefSS*( common*ny + nidSj*Si.y*invm_i + nidSi*Sj.y*invm_j );
+            az += -prefSS*( common*nz + nidSj*Si.z*invm_i + nidSi*Sj.z*invm_j );
         }
     }
 

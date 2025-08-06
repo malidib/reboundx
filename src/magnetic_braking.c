@@ -13,6 +13,7 @@
  * mb_on          (double, required ≠0)  – enable braking on this particle
  * mb_convective  (double, required ≠0)  – star has a convective envelope
  * mb_omega_sat   (double, optional)     – saturation angular velocity
+ * mb_tau_conv    (double, optional)     – convective turnover time
  * I              (double, required)     – moment of inertia
  * Omega          (reb_vec3d, required)  – spin angular‑velocity vector
  *
@@ -26,19 +27,23 @@
  *                                             (default 1).
  * mb_year        (double, optional)     – Julian year in code‑time units
  *                                             (default 1).
+ * mb_Rossby_sat  (double, optional)     – critical Rossby number for
+ *                                         saturation (default 0.1)
  *
  * All quantities are automatically converted to the simulation's unit
  * system; users need not manually rescale ``mb_K``.
 */
 
 #include <math.h>
+#include <stdio.h>
 #include "rebound.h"
 #include "reboundx.h"
 
 static inline void apply_magnetic_brake(struct reb_particle*    const p,
                                         struct rebx_extras*     const rx,
                                         const double            K,
-                                        const double            dt)
+                                        const double            dt,
+                                        const double            Rossby_sat)
 {
     /* ----------------------- fetch flags & properties ------------------- */
     const double* mb_on  = rebx_get_param(rx, p->ap, "mb_on");
@@ -61,8 +66,13 @@ static inline void apply_magnetic_brake(struct reb_particle*    const p,
     if (!isfinite(omega) || omega == 0.0) return;
 
     const double* sat_ptr   = rebx_get_param(rx, p->ap, "mb_omega_sat");
-    const double  omega_sat = (sat_ptr && *sat_ptr > 0.0 && isfinite(*sat_ptr))
-                              ? *sat_ptr : INFINITY;
+    const double* tau_ptr   = rebx_get_param(rx, p->ap, "mb_tau_conv");
+    double omega_sat = INFINITY;
+    if (tau_ptr && *tau_ptr > 0.0 && isfinite(*tau_ptr)){
+        omega_sat = 2.0*M_PI/(Rossby_sat * (*tau_ptr));
+    }
+    if (sat_ptr && *sat_ptr > 0.0 && isfinite(*sat_ptr))
+        omega_sat = *sat_ptr;
 
     /* --------------------------- torque magnitude ----------------------- */
     double omega_term = omega*omega*omega;          /* unsaturated default  */
@@ -76,7 +86,10 @@ static inline void apply_magnetic_brake(struct reb_particle*    const p,
     const double scale     = 1.0 + (domega_dt / omega)*dt;
 
     /* Prevent overshoot that could flip the spin */
-    if (scale <= 0.0) return;
+    if (scale <= 0.0){
+        fprintf(stderr, "[magnetic_braking] spin update skipped (dt too large, particle hash %u)\n", p->hash);
+        return;
+    }
 
     Omega->x *= scale;
     Omega->y *= scale;
@@ -121,7 +134,11 @@ void rebx_magnetic_braking(struct reb_simulation* const sim,
 
     if (dt <= 0.0 || !isfinite(dt)) return;
 
+    double Rossby_sat = 0.1; /* default critical Rossby number */
+    const double* Ro_ptr = rebx_get_param(rx, op->ap, "mb_Rossby_sat");
+    if (Ro_ptr && isfinite(*Ro_ptr) && *Ro_ptr > 0.0) Rossby_sat = *Ro_ptr;
+
     for (int i = 0; i < N; i++){
-        apply_magnetic_brake(&sim->particles[i], rx, K, dt);
+        apply_magnetic_brake(&sim->particles[i], rx, K, dt, Rossby_sat);
     }
 }

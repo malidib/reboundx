@@ -196,6 +196,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
 /* ---------- sub‑stepping loop ------------------------------------------- */
     double t_left = dt_req;
     int    steps  = 0;
+    double dE_total = 0.0;       /* accumulated energy non-conservation */
 
     while(t_left > 0.0 && (steps < min_steps || t_left > 1e-14*dt_req)){
         double dt = t_left / (double)( (min_steps-steps) > 0 ? (min_steps-steps) : 1 );
@@ -267,10 +268,23 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                     double Lmag = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99;
                     double j_orb = Lmag / (d->m * a->m / (d->m + a->m));
                     double j_target = jloss_factor * j_orb;
-                    /* choose an arbitrary perpendicular direction */
-                    double vxu,vyu,vzu; cross3(dx,dy,dz, 0,0,1, &vxu,&vyu,&vzu);
-                    double vu_norm = sqrt(vxu*vxu + vyu*vyu + vzu*vzu) + 1e-99;
-                    double fac = (j_target / r) / vu_norm;
+
+                    /* Perpendicular direction via right‑hand rule e⊥ ∝ (n×v)×n */
+                    double nx = dx/r, ny = dy/r, nz = dz/r;
+                    double lx,ly,lz; cross3(nx,ny,nz, vrelx,vrely,vrelz, &lx,&ly,&lz); /* n×v */
+                    double ex,ey,ez; cross3(lx,ly,lz, nx,ny,nz, &ex,&ey,&ez);         /* (n×v)×n */
+                    double norm = sqrt(ex*ex + ey*ey + ez*ez);
+                    if(norm < 1e-12){
+                        /* fallback if n and v are parallel */
+                        cross3(nx,ny,nz, 0,0,1, &ex,&ey,&ez);
+                        norm = sqrt(ex*ex + ey*ey + ez*ez);
+                        if(norm < 1e-12){
+                            cross3(nx,ny,nz, 1,0,0, &ex,&ey,&ez);
+                            norm = sqrt(ex*ex + ey*ey + ez*ez);
+                        }
+                    }
+                    double vxu = ex/norm, vyu = ey/norm, vzu = ez/norm;
+                    double fac = (j_target / r);
                     vx_loss = d->vx + fac*vxu;
                     vy_loss = d->vy + fac*vyu;
                     vz_loss = d->vz + fac*vzu;
@@ -281,6 +295,9 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
 
 /* ---- mass update ------------------------------------------------------ */
             double Md0 = d->m, Ma0 = a->m;
+            double E_before = 0.5*Md0*(d->vx*d->vx + d->vy*d->vy + d->vz*d->vz)
+                             + 0.5*Ma0*(a->vx*a->vx + a->vy*a->vy + a->vz*a->vz)
+                             - sim->G*Md0*Ma0/r;
             d->m -= m_loss;
             a->m += m_acc;
             double Md1 = d->m, Ma1 = a->m;
@@ -329,6 +346,12 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                 d->vx -= dvx*(Ma1/Md1); d->vy -= dvy*(Ma1/Md1); d->vz -= dvz*(Ma1/Md1);
             }
 
+            /* energy diagnostic after mass transfer & L correction */
+            double E_after = 0.5*Md1*(d->vx*d->vx + d->vy*d->vy + d->vz*d->vz)
+                            + 0.5*Ma1*(a->vx*a->vx + a->vy*a->vy + a->vz*a->vz)
+                            - sim->G*Md1*Ma1/r;
+            dE_total += (E_after - E_before);
+
 /* ---- donor radius mass‑radius relation -------------------------------- */
             const double* R_slope_ptr = rebx_get_param(rebx, d->ap,"rlmt_R_slope");
             const double* R_refM_ptr  = rebx_get_param(rebx, d->ap,"rlmt_R_ref_mass");
@@ -368,9 +391,11 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
             double xmin = xmin_ptr ? *xmin_ptr : 1e-4;
             double Qd   = Qd_ptr   ? *Qd_ptr   : 0.0;
 
-            double I = I_prefactor(vrel / cs, xmin);
+            double vfloor = 1e-3 * cs;
+            double vrel_eff = MAX(vrel, vfloor);
+            double I = I_prefactor(vrel_eff / cs, xmin);
             double fc = 4.0 * M_PI * sim->G*sim->G * a->m * rho /
-                        (vrel*vrel*vrel) * I;
+                        (vrel_eff*vrel_eff*vrel_eff) * I;
             if(Qd > 0.0 && a->r > 0.0)
                 fc += M_PI * rho * a->r*a->r * vrel * Qd / a->m;
 
@@ -431,6 +456,8 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
         t_left -= dt;
         steps++;
     } /* ------------------- end sub‑stepping loop ----------------------- */
+
+    rebx_set_param_double(rebx, &op->ap, "rlmt_last_dE", dE_total);
 
     /* final recentre on COM */
     reb_simulation_move_to_com(sim);
