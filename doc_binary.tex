@@ -217,11 +217,12 @@ $|\Delta\mathbf v|\le\texttt{ce\_kick\_cfl}\times c_s$ to preserve accuracy
 in highly supersonic or stratified flows.
 
 \paragraph{Numerical stability.}
-The denominator $v_{\rm rel}^3$ is left \emph{unfloored}; instead the code
-ensures $v_{\rm rel}$ never becomes arbitrarily small via the
-sub‑step criterion $\Delta r/r\le\texttt{rlmt\_substep\_max\_dr}$ and likewise
-limits mass changes through $\Delta M/M\le\texttt{rlmt\_substep\_max\_dm}$.
-Users who require an explicit floor can modify the source accordingly.
+Before evaluating the drag, the relative speed is floored to
+$v_{\rm rel,eff}=\max(v_{\rm rel},10^{-3}c_s)$ so the prefactor in
+Eq.~\eqref{eq:I_prefactor} remains finite even for very small Mach numbers.
+The sub‑step criteria $\Delta r/r\le\texttt{rlmt\_substep\_max\_dr}$ and
+$\Delta M/M\le\texttt{rlmt\_substep\_max\_dm}$ provide additional control over
+numerical stability.
 
 %-------------------------------------------------------------------------------
 \subsection{Magnetic Braking}
@@ -250,8 +251,14 @@ which define the solar mass, solar radius, and Julian year in code units.
 Users therefore need not rescale $K$ manually.
 
 \paragraph{Saturation.} If a particle specifies a saturation threshold
-\texttt{mb\_omega\_sat} and $\omega>\omega_{\rm sat}$, the cubic dependence is
-replaced with $\omega\,\omega_{\rm sat}^2$, so the torque scales linearly with $\omega$ above the threshold.
+the critical angular velocity $\omega_{\rm sat}$ is determined as follows.
+If the particle supplies a convective turnover time \texttt{mb\_tau\_conv}, the
+code sets $\omega_{\rm sat}=2\pi/(\texttt{mb\_Rossby\_sat}\times\texttt{mb\_tau\_conv})$,
+where the operator parameter \texttt{mb\_Rossby\_sat} (default 0.1) is the
+critical Rossby number.  A user-specified \texttt{mb\_omega\_sat} overrides this
+value.  When $\omega>\omega_{\rm sat}$, the cubic dependence in
+Eq.~\eqref{eq:mb_torque} is replaced with $\omega\,\omega_{\rm sat}^2$, so the
+torque scales linearly with $\omega$ above the threshold.
 
 \paragraph{Activation.} Magnetic braking is applied only when a particle sets
 \texttt{mb\_on}=1 and has \texttt{mb\_convective}=1. Missing parameters,
@@ -272,9 +279,11 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{mb\_Msun} (op) & mass & 1 & Solar mass in code units\\
 \texttt{mb\_Rsun} (op) & length & 1 & Solar radius in code units\\
 \texttt{mb\_year} (op) & time & 1 & Julian year in code units\\
+\texttt{mb\_Rossby\_sat} (op) & — & 0.1 & Critical Rossby number\\
 \texttt{mb\_on} (part) & bool & 0 & Enable magnetic braking\\
 \texttt{mb\_convective} (part) & bool & 0 & Convective‑envelope flag\\
 \texttt{mb\_omega\_sat} (part) & 1/t & $\infty$ & Saturation angular velocity\\
+\texttt{mb\_tau\_conv} (part) & time & — & Convective turnover time\\
 \texttt{I} (part) & mass\,length$^2$ & — & Moment of inertia\\
 \texttt{Omega} (part, vec) & 1/t & — & Spin angular-velocity vector (\texttt{reb\_vec3d})\\
 \bottomrule
@@ -294,9 +303,10 @@ $R$, the mass-loss rate is
 where the dimensionless efficiency $\eta$ together with $L$ and $R$ are
 specified per particle. Mass is removed isotropically with no linear-momentum
 recoil; virtual particles are ignored and after mass loss the system is
-recentred on the centre of mass. The prefactor, solar reference values, and
-the year length can be adjusted via operator parameters
-(Table~\ref{tab:swml}).
+recentred on the centre of mass.  A safety limiter caps the fractional
+mass change to \texttt{swml\_max\_dlnM} (default $0.1$) per call.  The
+prefactor, solar reference values, and the year length can be adjusted via
+operator parameters (Table~\ref{tab:swml}).
 
 \begin{table}[h]
 \centering\footnotesize
@@ -314,6 +324,7 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{swml\_Rsun}  (op) & length & 1 & Solar radius in code units\\
 \texttt{swml\_Lsun}  (op) & luminosity & 1 & Solar luminosity in code units\\
 \texttt{swml\_year}  (op) & time & 1 & Length of Julian year in code units\\
+\texttt{swml\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -554,13 +565,12 @@ B_{v,2}
 \end{align}
 \[
   \mathbf{a}_{2\mathrm{PN}}^{\rm ss}
-  = -\frac{3\,G^2}{5\,c^4\,\mu\,r^4}
-    \Bigl[
-      (S_1\!\cdot\!S_2)\,\mathbf{n}
-     +(\mathbf{n}\!\cdot\!S_1)\,S_2
-     +(\mathbf{n}\!\cdot\!S_2)\,S_1
-     -5\,(\mathbf{n}\!\cdot\!S_1)(\mathbf{n}\!\cdot\!S_2)\,\mathbf{n}
-    \Bigr].
+  = -\frac{3\,G}{c^4\,r^4}
+    \left[
+      \frac{S_1\!\cdot\!S_2-5(\mathbf{n}\!\cdot\!S_1)(\mathbf{n}\!\cdot\!S_2)}{m_1 m_2}\,\mathbf{n}
+     +\frac{\mathbf{n}\!\cdot\!S_2}{m_1^2}\,S_1
+     +\frac{\mathbf{n}\!\cdot\!S_1}{m_2^2}\,S_2
+    \right].
 \]
 Hence
 \[
