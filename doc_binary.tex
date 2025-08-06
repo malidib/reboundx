@@ -242,6 +242,12 @@ $2.7\times10^{47}$ in cgs).  The torque modifies the spin by
 $\dot{\bm\Omega}=\tau\,\bm\Omega/(I\,\omega)$ with $I$ the particle's moment
 of inertia.
 
+\paragraph{Units and scaling.} The code automatically converts the
+Verbunt–Zwaan/Kawaler constant into simulation units using the operator
+parameters \texttt{mb\_Msun}, \texttt{mb\_Rsun}, and \texttt{mb\_year}, which
+specify the solar mass, solar radius, and Julian year in code units. Users
+therefore need not rescale $K$ manually.
+
 \paragraph{Saturation.} If a particle specifies a saturation threshold
 \texttt{mb\_omega\_sat} and $\omega>\omega_{\rm sat}$, the cubic dependence is
 replaced with $\omega\,\omega_{\rm sat}^2$, yielding a constant torque at high
@@ -261,6 +267,9 @@ bypass the update.
 Name (scope) & Unit & Default & Purpose \\
 \midrule
 \texttt{mb\_K} (op) & cgs & $2.7\times10^{47}$ & Braking constant $K$\\
+\texttt{mb\_Msun} (op) & mass & 1 & Solar mass in code units\\
+\texttt{mb\_Rsun} (op) & length & 1 & Solar radius in code units\\
+\texttt{mb\_year} (op) & time & 1 & Julian year in code units\\
 \texttt{mb\_on} (part) & bool & 0 & Enable magnetic braking\\
 \texttt{mb\_convective} (part) & bool & 0 & Convective‑envelope flag\\
 \texttt{mb\_omega\_sat} (part) & 1/t & $\infty$ & Saturation angular velocity\\
@@ -363,9 +372,13 @@ particle of mass $M$ (in $M_\odot$) we set
 R = R_{\rm coeff} R_\odot \left(\frac{M}{M_\odot}\right)^{R_{\rm exp}},\qquad
 L = L_{\rm coeff} L_\odot \left(\frac{M}{M_\odot}\right)^{L_{\rm exp}}.
 \]
-The particle's radius field is replaced by $R$, and the values $R$ and $L$
-are written to the attributes \texttt{swml\_R} and \texttt{swml\_L} so that
-the wind-mass-loss operator can consume them.
+The mass ratio $M/M_\odot$ uses the operator parameter
+\texttt{sse\_Msun} (default 1) to convert code masses into solar masses;
+\texttt{sse\_Rsun} and \texttt{sse\_Lsun} analogously define the solar radius
+and luminosity in code units.  The particle's radius field is replaced by $R$,
+and the values $R$ and $L$ are written to the attributes
+\texttt{swml\_R} and \texttt{swml\_L} so that the wind-mass-loss operator can
+consume them.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -375,6 +388,7 @@ the wind-mass-loss operator can consume them.
 \toprule
 Name (scope) & Unit & Default & Purpose \\
 \midrule
+\texttt{sse\_Msun}   (op) & mass      & 1   & Solar mass in code units\\
 \texttt{sse\_Rsun}   (op) & length     & 1   & Solar radius in code units\\
 \texttt{sse\_Lsun}   (op) & luminosity & 1   & Solar luminosity in code units\\
 \texttt{sse\_R\_coeff} (op) & —       & 1   & Radius scaling prefactor\\
