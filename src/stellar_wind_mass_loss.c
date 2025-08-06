@@ -14,6 +14,7 @@
  *  swml_Lsun   (double, optional)  – Solar luminosity in code‑lum  units (default 1)
  *  swml_year   (double, optional)  – Length of one Julian year in code‑time
  *                                    units (default 1 → legacy behaviour).
+ *  swml_max_dlnM (double, optional) – max |ΔM|/M per call (default 0.1)
  *
  * Particle‑level parameters
  * -------------------------
@@ -50,18 +51,21 @@ void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
     double Lsun     = 1.0;    /* code‑lum   units per solar luminosity      */
     double C0       = 4.0e-13;/* base prefactor [M☉ yr⁻¹]                   */
     double year_len = 1.0;    /* code‑time units per Julian year            */
+    double max_dlnM = 0.1;    /* safety limiter                             */
 
     const double* pM  = rebx_get_param(rx, op->ap, "swml_Msun");
     const double* pR  = rebx_get_param(rx, op->ap, "swml_Rsun");
     const double* pL  = rebx_get_param(rx, op->ap, "swml_Lsun");
     const double* pC  = rebx_get_param(rx, op->ap, "swml_const");
     const double* pYr = rebx_get_param(rx, op->ap, "swml_year");
+    const double* pMax= rebx_get_param(rx, op->ap, "swml_max_dlnM");
 
     if (pM  && isfinite(*pM ) && *pM  > 0.0) Msun     = *pM;
     if (pR  && isfinite(*pR ) && *pR  > 0.0) Rsun     = *pR;
     if (pL  && isfinite(*pL ) && *pL  > 0.0) Lsun     = *pL;
     if (pC  && isfinite(*pC ) && *pC  > 0.0) C0       = *pC;
     if (pYr && isfinite(*pYr) && *pYr > 0.0) year_len = *pYr;
+    if (pMax && isfinite(*pMax) && *pMax > 0.0) max_dlnM = *pMax;
 
     /* Prefactor converted to *code‑mass per code‑time* */
     const double pref = (C0 * Msun) / year_len;      /* [code‑mass / code‑time] */
@@ -93,7 +97,9 @@ void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
                             * (R / Rsun)
                             * (Msun / p->m);     /* [code‑mass / code‑time] */
 
-        const double dM = mdot * dt;             /* negative number         */
+        double dM = mdot * dt;                   /* negative number         */
+        const double dM_lim = -max_dlnM * p->m;  /* cap fractional change   */
+        if (dM < dM_lim) dM = dM_lim;
 
         /* Prevent negative masses */
         if (p->m + dM <= 0.0) {
