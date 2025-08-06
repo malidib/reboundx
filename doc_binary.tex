@@ -255,7 +255,9 @@ replaced with $\omega\,\omega_{\rm sat}^2$, so the torque scales linearly with $
 \paragraph{Activation.} Magnetic braking is applied only when a particle sets
 \texttt{mb\_on}=1 and has \texttt{mb\_convective}=1. Missing parameters,
 non‑positive $I$, vanishing spin vectors, or non‑finite $M$ or $R$ all
-bypass the update.
+bypass the update.  The spin is rescaled by $1+[(\tau/I\omega)\,\Delta t]$;
+if this factor would be non‑positive—and thus flip the spin—the step is
+skipped.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -377,7 +379,8 @@ The mass ratio $M/M_\odot$ uses the operator parameter
 and luminosity in code units.  The particle's radius field is replaced by $R$,
 and the values $R$ and $L$ are written to the attributes
 \texttt{swml\_R} and \texttt{swml\_L} so that the wind-mass-loss operator can
-consume them.
+consume them. Virtual particles are skipped, and stellar masses remain
+unchanged.
 
 \begin{table}[h]
 \centering\footnotesize
