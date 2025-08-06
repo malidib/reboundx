@@ -250,8 +250,7 @@ therefore need not rescale $K$ manually.
 
 \paragraph{Saturation.} If a particle specifies a saturation threshold
 \texttt{mb\_omega\_sat} and $\omega>\omega_{\rm sat}$, the cubic dependence is
-replaced with $\omega\,\omega_{\rm sat}^2$, yielding a constant torque at high
-rotation rates.
+replaced with $\omega\,\omega_{\rm sat}^2$, so the torque scales linearly with $\omega$ above the threshold.
 
 \paragraph{Activation.} Magnetic braking is applied only when a particle sets
 \texttt{mb\_on}=1 and has \texttt{mb\_convective}=1. Missing parameters,
@@ -547,11 +546,11 @@ B_{v,2}
 &= -\tfrac{1}{2}\,\dot r
    \Bigl[\eta(15+4\eta)\,v^2
          -(4+41\eta+8\eta^2)\,\tfrac{G\,m}{r}
-         -3\eta\,\dot r^2\Bigr],
+         -3\eta(3+2\eta)\,\dot r^2\Bigr],
 \end{align}
 \[
   \mathbf{a}_{2\mathrm{PN}}^{\rm ss}
-  = -\frac{3\,G^2}{c^4\,\mu\,r^4}
+  = -\frac{3\,G^2}{5\,c^4\,\mu\,r^4}
     \Bigl[
       (S_1\!\cdot\!S_2)\,\mathbf{n}
      +(\mathbf{n}\!\cdot\!S_1)\,S_2
