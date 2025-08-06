@@ -204,7 +204,8 @@ is added.
 \paragraph{Envelope structure.}
 Density $\rho$ and sound speed $c_s$ are taken from either
 (i) a power‑law $\rho=\rho_0s^{\alpha_\rho}$, $c_s=c_{s0}s^{\alpha_{c_s}}$
-or
+specified by the operator parameters \texttt{ce\_rho0}, \texttt{ce\_alpha\_rho},
+\texttt{ce\_cs}, and \texttt{ce\_alpha\_cs}; or
 (ii) a user‑supplied tabulated profile $(s,\rho,c_s)$ loaded once via
 \texttt{ce\_profile\_file}.  The table overrides the power‑law and is sampled
 with log–log linear interpolation.  If neither option is provided the CE drag
@@ -242,11 +243,11 @@ $2.7\times10^{47}$ in cgs).  The torque modifies the spin by
 $\dot{\bm\Omega}=\tau\,\bm\Omega/(I\,\omega)$ with $I$ the particle's moment
 of inertia.
 
-\paragraph{Units and scaling.} The code automatically converts the
-Verbunt–Zwaan/Kawaler constant into simulation units using the operator
-parameters \texttt{mb\_Msun}, \texttt{mb\_Rsun}, and \texttt{mb\_year}, which
-specify the solar mass, solar radius, and Julian year in code units. Users
-therefore need not rescale $K$ manually.
+\paragraph{Units and scaling.} The parameter \texttt{mb\_K} is specified in cgs
+units but is internally converted to the simulation's unit system using the
+operator parameters \texttt{mb\_Msun}, \texttt{mb\_Rsun}, and \texttt{mb\_year},
+which define the solar mass, solar radius, and Julian year in code units.
+Users therefore need not rescale $K$ manually.
 
 \paragraph{Saturation.} If a particle specifies a saturation threshold
 \texttt{mb\_omega\_sat} and $\omega>\omega_{\rm sat}$, the cubic dependence is
@@ -275,7 +276,7 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{mb\_convective} (part) & bool & 0 & Convective‑envelope flag\\
 \texttt{mb\_omega\_sat} (part) & 1/t & $\infty$ & Saturation angular velocity\\
 \texttt{I} (part) & mass\,length$^2$ & — & Moment of inertia\\
-\texttt{Omega} (part) & 1/t & — & Spin angular frequency vector\\
+\texttt{Omega} (part, vec) & 1/t & — & Spin angular-velocity vector (\texttt{reb\_vec3d})\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -608,7 +609,7 @@ Field            & Unit             & Description                               
 \toprule
 Field               & Unit               & Description                               \\
 \midrule
-\texttt{pn\_spin}    & mass\,$L^2$/time   & Spin angular momentum vector (optional)   \\
+\texttt{pn\_spin}    & mass\,$L^2$/time   & Spin angular-momentum vector (\texttt{reb\_vec3d}, optional)   \\
 \bottomrule
 \end{tabular}
 \end{table}
