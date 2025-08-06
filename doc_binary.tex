@@ -46,7 +46,7 @@ systemic winds, and common‑envelope drag within a momentum‑conserving
 framework featuring adaptive sub‑stepping and robust merge guards.
 Separate operators implement magnetic braking, isotropic stellar‑wind
 mass loss, thermally driven winds, simplified stellar‑evolution scalings,
-and post‑Newtonian relativistic corrections through 2.5PN order.  Equations are derived,
+and post‑Newtonian relativistic corrections up to 2.5PN order with spin--orbit and spin--spin couplings.  Equations are derived,
 parameters are tabulated, and algorithmic
 choices are clarified so that this document can serve as an archival,
 citable reference.
@@ -457,9 +457,15 @@ Name (scope) & Unit & Default & Purpose \\
 %-------------------------------------------------------------------------------
 \section{Post-Newtonian Relativistic Corrections}
 Compact binaries also experience post-Newtonian forces that drive apsidal
-precession and couple the eccentricity and inclination. We provide a dedicated
-force \texttt{post\_newtonian} implementing the leading conservative $1$PN and
-dissipative $2.5$PN terms for every particle pair.
+precession, couple the spins, and radiate orbital energy. We provide a
+dedicated force \texttt{post\_newtonian} implementing the harmonic-coordinate
+equations of motion of \citet{Kidder1995} for every massive pair:
+\begin{itemize}[nosep,leftmargin=1.8em]
+\item $1$PN conservative terms;
+\item $1.5$PN spin--orbit couplings;
+\item $2$PN point-mass and spin--spin corrections; and
+\item $2.5$PN gravitational-wave radiation reaction.
+\end{itemize}
 
 For bodies with masses $m_i$ and $m_j$ separated by $\mathbf{r}$ and with
 relative velocity $\mathbf{v}$, the force adds to the relative acceleration
@@ -470,25 +476,47 @@ relative velocity $\mathbf{v}$, the force adds to the relative acceleration
 \mathbf{a}_{2.5\mathrm{PN}} &= \frac{8 G^2 m^2 \eta}{5 c^5 r^3}\Bigl[\dot r\Bigl(18 v^2 + \tfrac{2}{3}\frac{G m}{r}-25\dot r^2\Bigr)\mathbf{n}-\Bigl(6 v^2 - 2\frac{G m}{r}-15\dot r^2\Bigr)\mathbf{v}\Bigr],
 \end{align}
 where $m=m_i+m_j$, $\eta=m_i m_j/m^2$, $\mathbf{n}=\mathbf{r}/r$, and
-$\dot r = \mathbf{v}\cdot\mathbf{n}$. These expressions correspond to
-Eqs.~2.2b and~2.2f of \citet{Kidder1995}. The relative acceleration is
-distributed to the two particles in proportion to their masses, preserving
-linear momentum.
+$\dot r = \mathbf{v}\cdot\mathbf{n}$. The 1.5PN spin--orbit and 2PN
+point-mass plus spin--spin terms follow Eqs.~2.2c--e of
+\citet{Kidder1995} and depend on the spin vectors supplied through
+\texttt{pn\_spin}. The relative acceleration is distributed to the two
+particles in proportion to their masses, preserving linear momentum.
 
 The only required effect parameter is the speed of light $c$, specified through
-the field name \texttt{c}. Setting $c$ consistently with the simulation units
+the field name \texttt{c}. Optional integer flags \texttt{pn\_1PN},
+\texttt{pn\_15PN}, \texttt{pn\_2PN}, and \texttt{pn\_25PN} (all default to 1)
+toggle the inclusion of the corresponding orders. Each particle may supply a
+spin angular momentum vector via \texttt{pn\_spin} to activate the
+spin-dependent terms. Setting $c$ consistently with the simulation units
 reproduces the classical perihelion advance and gravitational-wave driven
 inspiral~\citep{Einstein1915, Peters1964, Kidder1995}.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Post-Newtonian effect parameter}
+\caption{Post-Newtonian effect parameters}
 \label{tab:pn}
 \begin{tabular}{@{}lll@{}}
 \toprule
 Field & Unit & Description \\
 \midrule
 \texttt{c} & length/t & Speed of light (required)\\
+\texttt{pn\_1PN}  & --- & Include 1PN terms (default: 1)\\
+\texttt{pn\_15PN} & --- & Include 1.5PN spin--orbit terms (default: 1)\\
+\texttt{pn\_2PN}  & --- & Include 2PN terms (default: 1)\\
+\texttt{pn\_25PN} & --- & Include 2.5PN terms (default: 1)\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{Post-Newtonian particle parameter}
+\label{tab:pnparticle}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Field & Unit & Description \\
+\midrule
+\texttt{pn\_spin} & mass$\,L^2$/t & Spin angular momentum vector (optional)\\
 \bottomrule
 \end{tabular}
 \end{table}
