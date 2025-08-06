@@ -18,11 +18,18 @@
  *
  * Operator‑level parameters
  * -------------------------
- * mb_K           (double, optional)     – braking constant (default 2.7e47 cgs)
+ * mb_K           (double, optional)     – braking constant in cgs units
+ *                                             (default 2.7e47).
+ * mb_Msun        (double, optional)     – solar mass  in code‑mass units
+ *                                             (default 1).
+ * mb_Rsun        (double, optional)     – solar radius in code‑length units
+ *                                             (default 1).
+ * mb_year        (double, optional)     – Julian year in code‑time units
+ *                                             (default 1).
  *
- * NOTE:  K assumes R and M are supplied in the same units used to calibrate K.
- *        If your simulation units differ, rescale mb_K accordingly.
- */
+ * All quantities are automatically converted to the simulation's unit
+ * system; users need not manually rescale ``mb_K``.
+*/
 
 #include <math.h>
 #include "rebound.h"
@@ -62,7 +69,7 @@ static inline void apply_magnetic_brake(struct reb_particle*    const p,
     if (omega > omega_sat)                          /* saturated regime     */
         omega_term = omega * omega_sat * omega_sat;
 
-    const double torque = -K * sqrt(R) * (1.0 / sqrt(M)) * omega_term;  /* cgs‑like */
+    const double torque = -K * sqrt(R) * (1.0 / sqrt(M)) * omega_term;
 
     /* --------------------------- apply dΩ/dt ---------------------------- */
     const double domega_dt = torque / (*I_ptr);     /* scalar rate (negative) */
@@ -86,9 +93,31 @@ void rebx_magnetic_braking(struct reb_simulation* const sim,
     struct rebx_extras* const rx = sim->extras;
     const int N = sim->N;
 
+    /* Operator‑level parameters */
+    double Msun = 1.0;   /* code‑mass units per solar mass  */
+    double Rsun = 1.0;   /* code‑length units per solar radius */
+    double year = 1.0;   /* code‑time units per Julian year */
+
+    const double* pM = rebx_get_param(rx, op->ap, "mb_Msun");
+    const double* pR = rebx_get_param(rx, op->ap, "mb_Rsun");
+    const double* pY = rebx_get_param(rx, op->ap, "mb_year");
     const double* K_ptr = rebx_get_param(rx, op->ap, "mb_K");
-    const double  K     = (K_ptr && isfinite(*K_ptr) && *K_ptr > 0.0)
-                          ? *K_ptr : 2.7e47;      /* default from literature */
+
+    if (pM && isfinite(*pM) && *pM > 0.0) Msun = *pM;
+    if (pR && isfinite(*pR) && *pR > 0.0) Rsun = *pR;
+    if (pY && isfinite(*pY) && *pY > 0.0) year = *pY;
+
+    const double K_cgs = (K_ptr && isfinite(*K_ptr) && *K_ptr > 0.0)
+                            ? *K_ptr : 2.7e47;
+
+    /* Convert prefactor to code units */
+    const double Msun_cgs = 1.98847e33;
+    const double Rsun_cgs = 6.957e10;
+    const double year_cgs = 3.15576e7;
+    const double M_unit   = Msun_cgs / Msun;      /* [g/code-mass] */
+    const double L_unit   = Rsun_cgs / Rsun;      /* [cm/code-length] */
+    const double T_unit   = year_cgs / year;      /* [s/code-time] */
+    const double K = K_cgs / (pow(M_unit,1.5) * pow(L_unit,1.5) * T_unit);
 
     if (dt <= 0.0 || !isfinite(dt)) return;
 
