@@ -50,6 +50,11 @@ const char* rebx_githash_str = STRINGIFY(REBXGITHASH);             // This line 
 
 void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "c", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "pn_1PN", REBX_TYPE_INT);
+    rebx_register_param(rebx, "pn_15PN", REBX_TYPE_INT);
+    rebx_register_param(rebx, "pn_2PN", REBX_TYPE_INT);
+    rebx_register_param(rebx, "pn_25PN", REBX_TYPE_INT);
+    rebx_register_param(rebx, "pn_spin", REBX_TYPE_VEC3D);
     rebx_register_param(rebx, "gr_source", REBX_TYPE_INT);
     rebx_register_param(rebx, "tau_mass", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "force", REBX_TYPE_FORCE);
