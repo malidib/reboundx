@@ -457,96 +457,151 @@ Name (scope) & Unit & Default & Purpose \\
 %-------------------------------------------------------------------------------
 \section{Post‐Newtonian Relativistic Corrections}
 
-Compact binaries also experience post‐Newtonian forces that drive apsidal
-precession, couple the spins, and radiate orbital energy.  We provide the
-\texttt{post\_newtonian} effect, which implements the harmonic‐coordinate
-point‐mass equations of motion of \citet{Kidder1995} for every massive pair:
+Compact binaries experience post‐Newtonian forces that drive apsidal
+precession, couple the spins, and radiate orbital energy.  The
+\texttt{post\_newtonian} effect implements the harmonic‐coordinate
+point‐mass equations of motion of \citet{Kidder1995} for each pair of
+massive bodies:
 \begin{itemize}[nosep,leftmargin=1.8em]
-  \item $1$\,PN conservative periapsis‐precession terms;
+  \item $1$\,PN conservative periapsis‐precession;
   \item $1.5$\,PN spin–orbit couplings;
-  \item $2$\,PN point‐mass and spin–spin conservative corrections; and
+  \item $2$\,PN point‐mass and spin–spin conservative corrections;
   \item $2.5$\,PN gravitational‐wave radiation reaction.
 \end{itemize}
 
-For two bodies of mass $m_i$ and $m_j$ separated by $\mathbf{r}$ with
-relative velocity $\mathbf{v}$, let
+\medskip
+\noindent
+For two bodies with masses $m_i$, $m_j$, separation vector $\mathbf{r}$,
+relative velocity $\mathbf{v}$, define
 \[
-  m = m_i + m_j, \quad
-  \eta = \frac{m_i m_j}{m^2}, \quad
-  \mathbf{n} = \frac{\mathbf{r}}{r}, \quad
-  \dot r = \mathbf{v}\cdot\mathbf{n}.
+  m = m_i + m_j,\quad
+  \eta = \frac{m_i\,m_j}{m^2},\quad
+  \mathbf{n} = \frac{\mathbf{r}}{r},\quad
+  \dot r = \mathbf{v}\cdot\mathbf{n},\quad
+  \mu = \frac{m_i\,m_j}{m}.
 \]
-Then the added relative acceleration is
+Then the relative acceleration additions are:
+
+\medskip
+\noindent\textbf{$1$\,PN (Eq.​2.2b of \citealp{Kidder1995}):}
+\begin{align}
+\mathbf{a}_{1\mathrm{PN}}
+&= -\frac{G\,m}{r^2\,c^2}
+   \Bigl[
+     \mathbf{n}\bigl((1+3\eta)\,v^2
+                   -2(2+\eta)\tfrac{G\,m}{r}
+                   -\tfrac{3}{2}\,\eta\,\dot r^2\bigr)
+   \Bigr]
+   +\frac{G\,m}{r^2\,c^2}(4-2\eta)\,\dot r\,\mathbf{v}.
+\end{align}
+
+\medskip
+\noindent\textbf{$1.5$\,PN spin–orbit (Eq.​2.2c of \citealp{Kidder1995}):}
 \[
-  \mathbf{a}_{\rm 1PN} =
-    -\frac{G m}{r^2 c^2}\Bigl[
-       \mathbf{n}\bigl((1+3\eta)v^2 - 2(2+\eta)\tfrac{Gm}{r} - \tfrac{3}{2}\eta\,\dot r^2\bigr)
-     \Bigr]
-    + \frac{G m}{r^2 c^2}(4-2\eta)\,\dot r\,\mathbf{v},
+  \mathbf{a}_{1.5\mathrm{PN}}
+  = \frac{G}{c^3\,r^3}
+    \Bigl[
+      6\,\mathbf{n}\bigl[(\mathbf{n}\times\mathbf{v})\!\cdot\!S_{\rm eff}\bigr]
+     -(\mathbf{v}\times S_{7})
+     +3\,\dot r\,(\mathbf{n}\times S_{3})
+    \Bigr],
+\]
+where
+\[
+  S = S_1 + S_2,\quad
+  \Delta = m\Bigl(\tfrac{S_2}{m_2}-\tfrac{S_1}{m_1}\Bigr),\quad
+  S_{\rm eff} = 2\,S + \frac{m_1-m_2}{m}\,\Delta,
 \]
 \[
-  \mathbf{a}_{\rm 2.5PN} =
-    \frac{8\,G^2 m^2\,\eta}{5\,c^5\,r^3}\Bigl[
-      \dot r\Bigl(18\,v^2 + \tfrac{2}{3}\,\tfrac{G m}{r} - 25\,\dot r^2\Bigr)\mathbf{n}
-     -\Bigl(6\,v^2 - 2\,\tfrac{G m}{r} - 15\,\dot r^2\Bigr)\mathbf{v}
+  S_{7} = 7\,S + 3\,\frac{m_1-m_2}{m}\,\Delta,\quad
+  S_{3} = 3\,S + \frac{m_1-m_2}{m}\,\Delta.
+\]
+
+\medskip
+\noindent\textbf{$2$\,PN conservative (Eqs.​2.2d–e of \citealp{Kidder1995}):}
+\begin{align}
+\mathbf{a}_{2\mathrm{PN}}^{\rm pm}
+&= -\frac{G\,m}{c^4\,r^2}
+   \Bigl[A_{2}\,\mathbf{n} \;+\; B_{v,2}\,\mathbf{v}\Bigr],\\
+A_{2}
+&= \tfrac{3}{4}(12+29\eta)\,\frac{G^2m^2}{r^2}
+ +\eta(3-4\eta)\,v^4
+ +\tfrac{15}{8}\,\eta(1-3\eta)\,\dot r^4
+ -\tfrac{3}{2}\,\eta(3-4\eta)\,v^2\dot r^2
+ -(2+25\eta+2\eta^2)\,\frac{G\,m}{r}\,\dot r^2,\\
+B_{v,2}
+&= -\tfrac{1}{2}\,\dot r
+   \Bigl[\eta(15+4\eta)\,v^2
+         -(4+41\eta+8\eta^2)\,\tfrac{G\,m}{r}
+         -3\eta\,\dot r^2\Bigr],
+\end{align}
+\[
+  \mathbf{a}_{2\mathrm{PN}}^{\rm ss}
+  = -\frac{3\,G^2}{c^4\,\mu\,r^4}
+    \Bigl[
+      (S_1\!\cdot\!S_2)\,\mathbf{n}
+     +(\mathbf{n}\!\cdot\!S_1)\,S_2
+     +(\mathbf{n}\!\cdot\!S_2)\,S_1
+     -5\,(\mathbf{n}\!\cdot\!S_1)(\mathbf{n}\!\cdot\!S_2)\,\mathbf{n}
     \Bigr].
 \]
-The $1.5$\,PN (spin–orbit) and $2$\,PN (point‐mass plus spin–spin) pieces
-are implemented exactly as Eqs.~2.2c–e of \citet{Kidder1995} and require each
-particle’s spin angular momentum vector, supplied via
-\texttt{pn\_spin}.  After computing the pairwise $\mathbf{a}$, it is
-distributed to the two bodies in proportion to their masses,
-so that total linear momentum is conserved.
+Hence
+\[
+  \mathbf{a}_{2\mathrm{PN}}
+  = \mathbf{a}_{2\mathrm{PN}}^{\rm pm}
+  +\mathbf{a}_{2\mathrm{PN}}^{\rm ss}.
+\]
+
+\medskip
+\noindent\textbf{$2.5$\,PN radiation reaction (Eq.​2.2f of \citealp{Kidder1995}):}
+\begin{align}
+\mathbf{a}_{2.5\mathrm{PN}}
+&= \frac{8\,G^2\,m^2\,\eta}{5\,c^5\,r^3}
+   \Bigl[
+     \dot r\Bigl(18\,v^2 + \tfrac{2}{3}\,\tfrac{G\,m}{r} - 25\,\dot r^2\Bigr)\mathbf{n}
+    -\Bigl(6\,v^2 - 2\,\tfrac{G\,m}{r} - 15\,\dot r^2\Bigr)\mathbf{v}
+   \Bigr].
+\end{align}
 
 \medskip
 \noindent
-The only required effect parameter is
-\[
-  \texttt{c}\quad\bigl[\text{length}/\text{time}\bigr],
-\]
-the speed of light in simulation units.  Four optional integer flags
-toggle each PN order (all default to 1):
-\[
-  \texttt{pn\_1PN},\;
-  \texttt{pn\_15PN},\;
-  \texttt{pn\_2PN},\;
-  \texttt{pn\_25PN}.
-\]
+These accelerations are computed pairwise and then split between bodies
+in proportion to their masses, ensuring total linear momentum conservation.
 
+\bigskip
+\noindent\textbf{Effect parameters:}
 \begin{table}[h]
 \centering\footnotesize
-\caption{Post‐Newtonian effect parameters}
-\label{tab:pn}
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Field}       & \textbf{Unit}     & \textbf{Description}                                       \\
+Field            & Unit             & Description                                \\
 \midrule
-\texttt{c}           & length/time       & Speed of light (required)                                  \\
-\texttt{pn\_1PN}     & —                 & Include $1$\,PN terms (default: 1)                         \\
-\texttt{pn\_15PN}    & —                 & Include $1.5$\,PN spin–orbit terms (default: 1)            \\
-\texttt{pn\_2PN}     & —                 & Include $2$\,PN point‐mass and spin–spin (default: 1)      \\
-\texttt{pn\_25PN}    & —                 & Include $2.5$\,PN radiation reaction (default: 1)          \\
+\texttt{c}        & length/time      & Speed of light (required)                  \\
+\texttt{pn\_1PN}  & —                & Include 1 PN terms (default: 1)             \\
+\texttt{pn\_15PN} & —                & Include 1.5 PN spin–orbit terms (default: 1)\\
+\texttt{pn\_2PN}  & —                & Include 2 PN terms (default: 1)             \\
+\texttt{pn\_25PN} & —                & Include 2.5 PN terms (default: 1)           \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\noindent\textbf{Particle parameter:}
 \begin{table}[h]
 \centering\footnotesize
-\caption{Post‐Newtonian particle parameter}
-\label{tab:pnparticle}
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Field}       & \textbf{Unit}         & \textbf{Description}                                \\
+Field               & Unit               & Description                               \\
 \midrule
-\texttt{pn\_spin}    & mass\,$L^2$/time     & Spin angular momentum vector (optional)             \\
+\texttt{pn\_spin}    & mass\,$L^2$/time   & Spin angular momentum vector (optional)   \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Setting $c$ (and optionally the four \texttt{pn\_*} flags) to unity, or
-to the desired ratio of code units to physical units, reproduces the
-classical tests of perihelion advance and gravitational‐wave inspiral
-\citep{Einstein1915, Peters1964, Kidder1995}.  
+Setting the effect parameter \texttt{c} to the appropriate ratio of code
+units to physical units reproduces the classical perihelion advance and
+gravitational‐wave driven inspiral
+\citep{Einstein1915,Peters1964,Kidder1995}.
+
 
 
 %-------------------------------------------------------------------------------
