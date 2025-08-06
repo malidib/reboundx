@@ -147,7 +147,9 @@ velocity shift
 is applied to the accretor to compensate for the angular momentum carried by
 the transferred gas and keep the system’s total angular momentum unchanged.
 The donor receives the opposite kick scaled by $M_{\mathrm a}/M_{\mathrm d}$ so
-that linear momentum remains conserved.
+that linear momentum remains conserved. For diagnostics the accumulated
+energy change $\Delta E$ from mass transfer and the angular‑momentum
+correction is written to the operator attribute \texttt{rlmt\_last\_dE}.
 
 \paragraph{Donor radius evolution (optional).}
 If the donor supplies a non-zero \texttt{rlmt\_R\_slope}, its radius is updated
@@ -478,6 +480,7 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{ce\_xmin}           (op) & — & $10^{-4}$ & Coulomb cutoff $x_{\min}$\\
 \texttt{ce\_Qd}             (op) & — & 0 & Geometric drag coefficient\\[0.2em]
 \texttt{merge\_eps}         (op) & length & $0.5\min(R_*,R_{\rm acc})$ & Merge radius\\
+\texttt{rlmt\_last\_dE}    (op, out) & energy & — & Energy change from last call\\
 \bottomrule
 \end{tabular}
 \end{table}
