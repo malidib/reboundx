@@ -455,71 +455,99 @@ Name (scope) & Unit & Default & Purpose \\
 \end{table}
 
 %-------------------------------------------------------------------------------
-\section{Post-Newtonian Relativistic Corrections}
-Compact binaries also experience post-Newtonian forces that drive apsidal
-precession, couple the spins, and radiate orbital energy. We provide a
-dedicated force \texttt{post\_newtonian} implementing the harmonic-coordinate
-equations of motion of \citet{Kidder1995} for every massive pair:
+\section{Post‐Newtonian Relativistic Corrections}
+
+Compact binaries also experience post‐Newtonian forces that drive apsidal
+precession, couple the spins, and radiate orbital energy.  We provide the
+\texttt{post\_newtonian} effect, which implements the harmonic‐coordinate
+point‐mass equations of motion of \citet{Kidder1995} for every massive pair:
 \begin{itemize}[nosep,leftmargin=1.8em]
-\item $1$PN conservative terms;
-\item $1.5$PN spin--orbit couplings;
-\item $2$PN point-mass and spin--spin corrections; and
-\item $2.5$PN gravitational-wave radiation reaction.
+  \item $1$\,PN conservative periapsis‐precession terms;
+  \item $1.5$\,PN spin–orbit couplings;
+  \item $2$\,PN point‐mass and spin–spin conservative corrections; and
+  \item $2.5$\,PN gravitational‐wave radiation reaction.
 \end{itemize}
 
-For bodies with masses $m_i$ and $m_j$ separated by $\mathbf{r}$ and with
-relative velocity $\mathbf{v}$, the force adds to the relative acceleration
-\begin{align}
-\mathbf{a}_{1\mathrm{PN}} &= -\frac{G m}{r^2 c^2}
-   \Bigl[\mathbf{n}\bigl((1+3\eta)v^2 - 2(2+\eta)\frac{G m}{r}-\tfrac{3}{2}\eta\dot r^2\bigr)\Bigr]
-   +\frac{G m}{r^2 c^2}(4-2\eta)\dot r\,\mathbf{v},\\
-\mathbf{a}_{2.5\mathrm{PN}} &= \frac{8 G^2 m^2 \eta}{5 c^5 r^3}\Bigl[\dot r\Bigl(18 v^2 + \tfrac{2}{3}\frac{G m}{r}-25\dot r^2\Bigr)\mathbf{n}-\Bigl(6 v^2 - 2\frac{G m}{r}-15\dot r^2\Bigr)\mathbf{v}\Bigr],
-\end{align}
-where $m=m_i+m_j$, $\eta=m_i m_j/m^2$, $\mathbf{n}=\mathbf{r}/r$, and
-$\dot r = \mathbf{v}\cdot\mathbf{n}$. The 1.5PN spin--orbit and 2PN
-point-mass plus spin--spin terms follow Eqs.~2.2c--e of
-\citet{Kidder1995} and depend on the spin vectors supplied through
-\texttt{pn\_spin}. The relative acceleration is distributed to the two
-particles in proportion to their masses, preserving linear momentum.
+For two bodies of mass $m_i$ and $m_j$ separated by $\mathbf{r}$ with
+relative velocity $\mathbf{v}$, let
+\[
+  m = m_i + m_j, \quad
+  \eta = \frac{m_i m_j}{m^2}, \quad
+  \mathbf{n} = \frac{\mathbf{r}}{r}, \quad
+  \dot r = \mathbf{v}\cdot\mathbf{n}.
+\]
+Then the added relative acceleration is
+\[
+  \mathbf{a}_{\rm 1PN} =
+    -\frac{G m}{r^2 c^2}\Bigl[
+       \mathbf{n}\bigl((1+3\eta)v^2 - 2(2+\eta)\tfrac{Gm}{r} - \tfrac{3}{2}\eta\,\dot r^2\bigr)
+     \Bigr]
+    + \frac{G m}{r^2 c^2}(4-2\eta)\,\dot r\,\mathbf{v},
+\]
+\[
+  \mathbf{a}_{\rm 2.5PN} =
+    \frac{8\,G^2 m^2\,\eta}{5\,c^5\,r^3}\Bigl[
+      \dot r\Bigl(18\,v^2 + \tfrac{2}{3}\,\tfrac{G m}{r} - 25\,\dot r^2\Bigr)\mathbf{n}
+     -\Bigl(6\,v^2 - 2\,\tfrac{G m}{r} - 15\,\dot r^2\Bigr)\mathbf{v}
+    \Bigr].
+\]
+The $1.5$\,PN (spin–orbit) and $2$\,PN (point‐mass plus spin–spin) pieces
+are implemented exactly as Eqs.~2.2c–e of \citet{Kidder1995} and require each
+particle’s spin angular momentum vector, supplied via
+\texttt{pn\_spin}.  After computing the pairwise $\mathbf{a}$, it is
+distributed to the two bodies in proportion to their masses,
+so that total linear momentum is conserved.
 
-The only required effect parameter is the speed of light $c$, specified through
-the field name \texttt{c}. Optional integer flags \texttt{pn\_1PN},
-\texttt{pn\_15PN}, \texttt{pn\_2PN}, and \texttt{pn\_25PN} (all default to 1)
-toggle the inclusion of the corresponding orders. Each particle may supply a
-spin angular momentum vector via \texttt{pn\_spin} to activate the
-spin-dependent terms. Setting $c$ consistently with the simulation units
-reproduces the classical perihelion advance and gravitational-wave driven
-inspiral~\citep{Einstein1915, Peters1964, Kidder1995}.
+\medskip
+\noindent
+The only required effect parameter is
+\[
+  \texttt{c}\quad\bigl[\text{length}/\text{time}\bigr],
+\]
+the speed of light in simulation units.  Four optional integer flags
+toggle each PN order (all default to 1):
+\[
+  \texttt{pn\_1PN},\;
+  \texttt{pn\_15PN},\;
+  \texttt{pn\_2PN},\;
+  \texttt{pn\_25PN}.
+\]
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Post-Newtonian effect parameters}
+\caption{Post‐Newtonian effect parameters}
 \label{tab:pn}
 \begin{tabular}{@{}lll@{}}
 \toprule
-Field & Unit & Description \\
+\textbf{Field}       & \textbf{Unit}     & \textbf{Description}                                       \\
 \midrule
-\texttt{c} & length/t & Speed of light (required)\\
-\texttt{pn\_1PN}  & --- & Include 1PN terms (default: 1)\\
-\texttt{pn\_15PN} & --- & Include 1.5PN spin--orbit terms (default: 1)\\
-\texttt{pn\_2PN}  & --- & Include 2PN terms (default: 1)\\
-\texttt{pn\_25PN} & --- & Include 2.5PN terms (default: 1)\\
+\texttt{c}           & length/time       & Speed of light (required)                                  \\
+\texttt{pn\_1PN}     & —                 & Include $1$\,PN terms (default: 1)                         \\
+\texttt{pn\_15PN}    & —                 & Include $1.5$\,PN spin–orbit terms (default: 1)            \\
+\texttt{pn\_2PN}     & —                 & Include $2$\,PN point‐mass and spin–spin (default: 1)      \\
+\texttt{pn\_25PN}    & —                 & Include $2.5$\,PN radiation reaction (default: 1)          \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Post-Newtonian particle parameter}
+\caption{Post‐Newtonian particle parameter}
 \label{tab:pnparticle}
 \begin{tabular}{@{}lll@{}}
 \toprule
-Field & Unit & Description \\
+\textbf{Field}       & \textbf{Unit}         & \textbf{Description}                                \\
 \midrule
-\texttt{pn\_spin} & mass$\,L^2$/t & Spin angular momentum vector (optional)\\
+\texttt{pn\_spin}    & mass\,$L^2$/time     & Spin angular momentum vector (optional)             \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+Setting $c$ (and optionally the four \texttt{pn\_*} flags) to unity, or
+to the desired ratio of code units to physical units, reproduces the
+classical tests of perihelion advance and gravitational‐wave inspiral
+\citep{Einstein1915, Peters1964, Kidder1995}.  
+
 
 %-------------------------------------------------------------------------------
 \section{Discussion and Future Extensions}
