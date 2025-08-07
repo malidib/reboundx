@@ -22,12 +22,10 @@ class TestStellarWinds(unittest.TestCase):
         star.params['swml_eta'] = 0.5
         star.params['tdw_eta'] = 1.0
         star.params['tdw_T'] = 1.5e6
-        star.params['tdw_R'] = star.r
 
         initial_mass = star.m
         for _ in range(5):
             sim.integrate(sim.t + 2.0e4)
-            star.params['tdw_R'] = star.r
 
         self.assertLess(star.m, initial_mass)
 
