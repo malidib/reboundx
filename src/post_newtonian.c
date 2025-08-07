@@ -25,6 +25,7 @@
 #include <math.h>
 #include "rebound.h"
 #include "reboundx.h"
+typedef struct reb_vec3d reb_vec3d;
 
 /* ------------------------------------------------------------------------- */
 /* Pair-wise accelerations                                                   */

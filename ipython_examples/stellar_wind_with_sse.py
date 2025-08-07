@@ -3,7 +3,7 @@ import reboundx
 
 sim = rebound.Simulation()
 sim.units = ('AU','yr','Msun')
-sim.G = 4*3.141592653589793**2
+#sim.G = 4*3.141592653589793**2
 sim.add(m=1., r=1.)
 
 rebx = reboundx.Extras(sim)
@@ -20,7 +20,7 @@ sim.particles[0].params['swml_L'] = 1.0
 
 print("Mass, radius and luminosity with winds:")
 for i in range(5):
-    sim.integrate(sim.t + 2e4)
+    sim.integrate(sim.t + 2e10)
     M = sim.particles[0].m
     R = sim.particles[0].r
     L = sim.particles[0].params['swml_L']
