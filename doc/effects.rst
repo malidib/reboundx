@@ -568,7 +568,9 @@ Python Example          `stellar_evolution_sse.py <https://github.com/dtamayo/re
 Updates stellar radius and luminosity using simplified analytic
 mass--radius and mass--luminosity relations.  The operator stores the
 resulting values in ``swml_R`` and ``swml_L`` so other effects (e.g.,
-stellar winds) can access them.
+stellar winds) can access them.  When loaded, any particle lacking a
+``swml_L`` parameter is initialized to ``1`` (in units of ``sse_Lsun``)
+so that downstream operators have a sensible default luminosity.
 
 **Effect Parameters**
 
