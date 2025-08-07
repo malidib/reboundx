@@ -193,9 +193,12 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "tdw_alpha_T", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "tdw_alpha_M", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "tdw_max_dlnM", REBX_TYPE_DOUBLE);
+    // Simplified stellar evolution operator
+    // Global constants
     rebx_register_param(rebx, "sse_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Lsun", REBX_TYPE_DOUBLE);
+    // Particle-level scaling parameters
     rebx_register_param(rebx, "sse_R_coeff", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_R_exp", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_L_coeff", REBX_TYPE_DOUBLE);
