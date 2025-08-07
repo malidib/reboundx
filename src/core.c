@@ -179,6 +179,21 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "swml_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Lsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_year", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "swml_max_dlnM", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_eta", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_T", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_R", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_const", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_Msun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_Rsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_Tsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_year", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_alpha_R", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_alpha_T", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_alpha_M", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "tdw_max_dlnM", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Rsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_Lsun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_R_coeff", REBX_TYPE_DOUBLE);
@@ -188,7 +203,12 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "mb_on", REBX_TYPE_INT);
     rebx_register_param(rebx, "mb_convective", REBX_TYPE_INT);
     rebx_register_param(rebx, "mb_omega_sat", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_tau_conv", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "mb_K", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_Msun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_Rsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_year", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "mb_Rossby_sat", REBX_TYPE_DOUBLE);
 }
 
 void rebx_register_param(struct rebx_extras* const rebx, const char* name, enum rebx_param_type type){
