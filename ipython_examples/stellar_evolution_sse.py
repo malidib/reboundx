@@ -19,10 +19,10 @@ for i in range(5):
 
 # Customize parameters
 
-sse.params['sse_R_coeff'] = 0.9
-sse.params['sse_R_exp'] = 0.6
-sse.params['sse_L_coeff'] = 1.2
-sse.params['sse_L_exp'] = 4.0
+sim.particles[0].params['sse_R_coeff'] = 0.9
+sim.particles[0].params['sse_R_exp'] = 0.6
+sim.particles[0].params['sse_L_coeff'] = 1.2
+sim.particles[0].params['sse_L_exp'] = 4.0
 
 sim.t = 0.0
 
@@ -36,10 +36,10 @@ for i in range(5):
 
 # Customize parameters
 
-sse.params['sse_R_coeff'] = 0.9
-sse.params['sse_R_exp'] = 0.6
-sse.params['sse_L_coeff'] = 1.2
-sse.params['sse_L_exp'] = 4.0
+sim.particles[0].params['sse_R_coeff'] = 0.9
+sim.particles[0].params['sse_R_exp'] = 0.6
+sim.particles[0].params['sse_L_coeff'] = 1.2
+sim.particles[0].params['sse_L_exp'] = 4.0
 
 sim.t = 0.0
 sim.particles[0].params['sse_age'] = 0.0

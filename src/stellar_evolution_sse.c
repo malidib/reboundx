@@ -43,28 +43,33 @@ void rebx_stellar_evolution_sse(struct reb_simulation* const sim, struct rebx_op
     double Msun = 1.;
     double Rsun = 1.;
     double Lsun = 1.;
-    double R_coeff = 1.;
-    double R_exp = 0.8;
-    double L_coeff = 1.;
-    double L_exp = 3.5;
+    // Default scaling coefficients/exponents
+    const double R_coeff_default = 1.;
+    const double R_exp_default   = 0.8;
+    const double L_coeff_default = 1.;
+    const double L_exp_default   = 3.5;
 
     const double* Msun_ptr = rebx_get_param(rebx, operator->ap, "sse_Msun");
     const double* Rsun_ptr = rebx_get_param(rebx, operator->ap, "sse_Rsun");
     const double* Lsun_ptr = rebx_get_param(rebx, operator->ap, "sse_Lsun");
-    const double* R_coeff_ptr  = rebx_get_param(rebx, operator->ap, "sse_R_coeff");
-    const double* R_exp_ptr    = rebx_get_param(rebx, operator->ap, "sse_R_exp");
-    const double* L_coeff_ptr  = rebx_get_param(rebx, operator->ap, "sse_L_coeff");
-    const double* L_exp_ptr    = rebx_get_param(rebx, operator->ap, "sse_L_exp");
     if (Msun_ptr) Msun = *Msun_ptr;
     if (Rsun_ptr) Rsun = *Rsun_ptr;
     if (Lsun_ptr) Lsun = *Lsun_ptr;
-    if (R_coeff_ptr) R_coeff = *R_coeff_ptr;
-    if (R_exp_ptr)   R_exp   = *R_exp_ptr;
-    if (L_coeff_ptr) L_coeff = *L_coeff_ptr;
-    if (L_exp_ptr)   L_exp   = *L_exp_ptr;
 
     for (int i=0; i<N_real; i++){
         struct reb_particle* const p = &sim->particles[i];
+        double R_coeff = R_coeff_default;
+        double R_exp   = R_exp_default;
+        double L_coeff = L_coeff_default;
+        double L_exp   = L_exp_default;
+        const double* R_coeff_ptr = rebx_get_param(rebx, p->ap, "sse_R_coeff");
+        const double* R_exp_ptr   = rebx_get_param(rebx, p->ap, "sse_R_exp");
+        const double* L_coeff_ptr = rebx_get_param(rebx, p->ap, "sse_L_coeff");
+        const double* L_exp_ptr   = rebx_get_param(rebx, p->ap, "sse_L_exp");
+        if (R_coeff_ptr) R_coeff = *R_coeff_ptr;
+        if (R_exp_ptr)   R_exp   = *R_exp_ptr;
+        if (L_coeff_ptr) L_coeff = *L_coeff_ptr;
+        if (L_exp_ptr)   L_exp   = *L_exp_ptr;
         const double mass_ratio = p->m / Msun;
         double R = R_coeff * Rsun * pow(mass_ratio, R_exp);
         double L = L_coeff * Lsun * pow(mass_ratio, L_exp);

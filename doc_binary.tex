@@ -390,8 +390,11 @@ L = L_{\rm coeff} L_\odot \left(\frac{M}{M_\odot}\right)^{L_{\rm exp}}.
 The mass ratio $M/M_\odot$ uses the operator parameter
 \texttt{sse\_Msun} (default 1) to convert code masses into solar masses;
 \texttt{sse\_Rsun} and \texttt{sse\_Lsun} analogously define the solar radius
-and luminosity in code units.  The particle's radius field is replaced by $R$,
-and the values $R$ and $L$ are written to the attributes
+and luminosity in code units.  Each particle may override the scaling using the
+particle-level parameters \texttt{sse\_R\_coeff}, \texttt{sse\_R\_exp},
+\texttt{sse\_L\_coeff}, and \texttt{sse\_L\_exp}; if unspecified, the default
+values in Table~\ref{tab:sse} are applied.  The particle's radius field is
+replaced by $R$, and the values $R$ and $L$ are written to the attributes
 \texttt{swml\_R} and \texttt{swml\_L} so that the wind-mass-loss operator can
 consume them. Virtual particles are skipped, and stellar masses remain
 unchanged.
@@ -407,10 +410,10 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{sse\_Msun}   (op) & mass      & 1   & Solar mass in code units\\
 \texttt{sse\_Rsun}   (op) & length     & 1   & Solar radius in code units\\
 \texttt{sse\_Lsun}   (op) & luminosity & 1   & Solar luminosity in code units\\
-\texttt{sse\_R\_coeff} (op) & —       & 1   & Radius scaling prefactor\\
-\texttt{sse\_R\_exp}   (op) & —       & 0.8 & Radius mass exponent\\
-\texttt{sse\_L\_coeff} (op) & —       & 1   & Luminosity scaling prefactor\\
-\texttt{sse\_L\_exp}   (op) & —       & 3.5 & Luminosity mass exponent\\
+\texttt{sse\_R\_coeff} (part) & —       & 1   & Radius scaling prefactor\\
+\texttt{sse\_R\_exp}   (part) & —       & 0.8 & Radius mass exponent\\
+\texttt{sse\_L\_coeff} (part) & —       & 1   & Luminosity scaling prefactor\\
+\texttt{sse\_L\_exp}   (part) & —       & 3.5 & Luminosity mass exponent\\
 \bottomrule
 \end{tabular}
 \end{table}
