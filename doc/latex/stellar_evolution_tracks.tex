@@ -13,7 +13,9 @@ its radius and luminosity using
 During the main sequence ($t<t_{\rm MS}$) the radius and luminosity
 increase linearly with $t/t_{\rm MS}$.  The updated values are stored
 on the particle itself and also as parameters ``swml_R`` and
-``swml_L`` so that other effects can access them.
+``swml_L`` so that other effects can access them.  When the operator
+is first loaded any particle missing ``swml_L`` is initialized to
+unity (in units of ``sse\_Lsun``).
 
 This implementation is highly approximate and intended only for simple
 experiments when a full stellar evolution code is unavailable.
