@@ -22,7 +22,7 @@
  * -------------------------
  *  tdw_eta        (double, req.) – heating efficiency η
  *  tdw_T          (double, req.) – coronal temperature  (same units as Tsun)
- *  tdw_R          (double, req.) – stellar radius       (same units as Rsun)
+ *  (stellar radius is taken from the particle's radius r)
  *
  * Notes
  * -----
@@ -86,12 +86,11 @@ void rebx_thermally_driven_winds(struct reb_simulation* const sim,
 
         const double* eta_ptr = rebx_get_param(rx, p->ap, "tdw_eta");
         const double* T_ptr   = rebx_get_param(rx, p->ap, "tdw_T");
-        const double* R_ptr   = rebx_get_param(rx, p->ap, "tdw_R");
-        if (!eta_ptr || !T_ptr || !R_ptr) continue;
+        if (!eta_ptr || !T_ptr) continue;
 
         const double eta = *eta_ptr;
         const double T   = *T_ptr;
-        const double R   = *R_ptr;
+        const double R   = p->r;
         if (eta <= 0.0 || !isfinite(eta)) continue;
         if (T   <= 0.0 || !isfinite(T  )) continue;
         if (R   <= 0.0 || !isfinite(R  )) continue;
