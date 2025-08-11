@@ -490,13 +490,12 @@ Name (scope) & Unit & Default & Purpose \\
 %-------------------------------------------------------------------------------
 \section{Post‐Newtonian Relativistic Corrections}
 
-Compact binaries experience post‐Newtonian forces that drive apsidal
-precession, couple the spins, and radiate orbital energy.  The
+Compact binaries experience post‐Newtonian forces that couple the spins
+and radiate orbital energy.  The
 \texttt{post\_newtonian} effect implements the harmonic‐coordinate
 point‐mass equations of motion of \citet{Kidder1995} for each pair of
 massive bodies:
 \begin{itemize}[nosep,leftmargin=1.8em]
-  \item $1$\,PN conservative periapsis‐precession;
   \item $1.5$\,PN spin–orbit couplings;
   \item $2$\,PN point‐mass and spin–spin conservative corrections;
   \item $2.5$\,PN gravitational‐wave radiation reaction.
@@ -514,20 +513,6 @@ relative velocity $\mathbf{v}$, define
   \mu = \frac{m_i\,m_j}{m}.
 \]
 Then the relative acceleration additions are:
-
-\medskip
-\noindent\textbf{$1$\,PN (Eq.​2.2b of \citealp{Kidder1995}):}
-\begin{align}
-\mathbf{a}_{1\mathrm{PN}}
-&= -\frac{G\,m}{r^2\,c^2}
-   \Bigl[
-     \mathbf{n}\bigl((1+3\eta)\,v^2
-                   -2(2+\eta)\tfrac{G\,m}{r}
-                   -\tfrac{3}{2}\,\eta\,\dot r^2\bigr)
-   \Bigr]
-   +\frac{G\,m}{r^2\,c^2}(4-2\eta)\,\dot r\,\mathbf{v}.
-\end{align}
-
 \medskip
 \noindent\textbf{$1.5$\,PN spin–orbit (Eq.​2.2c of \citealp{Kidder1995}):}
 \[
@@ -609,7 +594,6 @@ in proportion to their masses, ensuring total linear momentum conservation.
 Field            & Unit             & Description                                \\
 \midrule
 \texttt{c}        & length/time      & Speed of light (required)                  \\
-\texttt{pn\_1PN}  & —                & Include 1 PN terms (default: 1)             \\
 \texttt{pn\_15PN} & —                & Include 1.5 PN spin–orbit terms (default: 1)\\
 \texttt{pn\_2PN}  & —                & Include 2 PN terms (default: 1)             \\
 \texttt{pn\_25PN} & —                & Include 2.5 PN terms (default: 1)           \\
@@ -630,9 +614,9 @@ Field               & Unit               & Description                          
 \end{table}
 
 Setting the effect parameter \texttt{c} to the appropriate ratio of code
-units to physical units reproduces the classical perihelion advance and
-gravitational‐wave driven inspiral
-\citep{Einstein1915,Peters1964,Kidder1995}.
+units to physical units reproduces the post\hyp Newtonian spin couplings and
+gravitational\hyp wave driven inspiral
+\citep{Peters1964,Kidder1995}.
 
 
 

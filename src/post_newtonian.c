@@ -4,7 +4,6 @@
  *
  * Implements the harmonic-coordinate point-mass equations of motion
  * from Kidder (1995, Phys. Rev. D 52, 821) for every massive pair.
- *  – 1 PN   : conservative peri-apsis precession
  *  – 1.5 PN : spin–orbit couplings
  *  – 2 PN   : conservative point-mass + spin–spin corrections
  *  – 2.5 PN : gravitational-wave radiation reaction
@@ -12,7 +11,6 @@
  * Effect parameters
  * -----------------
  * c       (double, required)  – speed of light in simulation units
- * pn_1PN  (int,    optional)  – include 1 PN terms (default: 1)
  * pn_15PN (int,    optional)  – include 1.5 PN spin–orbit terms (default: 1)
  * pn_2PN  (int,    optional)  – include 2 PN terms (default: 1)
  * pn_25PN (int,    optional)  – include 2.5 PN terms (default: 1)
@@ -35,7 +33,6 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
                                struct reb_particle*   const pj,
                                const double                 G,
                                const double                 c,
-                               const int                    do1PN,
                                const int                    do15PN,
                                const int                    do2PN,
                                const int                    do25PN)
@@ -68,18 +65,6 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
     const double nz = dz*invr;
 
     double ax = 0.0, ay = 0.0, az = 0.0;
-
-    /* --- 1 PN conservative term (Kidder 1995 Eq.2.2b) --------------- */
-    if (do1PN) {
-        const double pref1 = G*m*invr2/(c*c);
-        const double An = (1.0 + 3.0*eta)*v2
-                        - 2.0*(2.0 + eta)*G*m*invr
-                        - 1.5*eta*rdot*rdot;
-        const double Bv = -2.0*(2.0 - eta)*rdot;
-        ax += -pref1*(An*nx + Bv*dvx);
-        ay += -pref1*(An*ny + Bv*dvy);
-        az += -pref1*(An*nz + Bv*dvz);
-    }
 
     /* --- 1.5 PN spin–orbit term (Kidder 1995 Eq.2.2c) ---------------- */
     if (do15PN) {
@@ -194,7 +179,6 @@ static void rebx_calculate_post_newtonian(struct reb_simulation* const sim,
                                           struct reb_particle*   const particles,
                                           const int                        N,
                                           const double                     c,
-                                          const int                        do1PN,
                                           const int                        do15PN,
                                           const int                        do2PN,
                                           const int                        do25PN)
@@ -205,7 +189,7 @@ static void rebx_calculate_post_newtonian(struct reb_simulation* const sim,
             pn_add_pair(sim,
                         &particles[i], &particles[j],
                         G, c,
-                        do1PN, do15PN, do2PN, do25PN);
+                        do15PN, do2PN, do25PN);
         }
     }
 }
@@ -223,14 +207,13 @@ void rebx_post_newtonian(struct reb_simulation* const sim,
         return;
     }
 
-    /* default all PN orders on */
-    int do1PN  = 1, do15PN = 1, do2PN = 1, do25PN = 1;
+    /* default all remaining PN orders on */
+    int do15PN = 1, do2PN = 1, do25PN = 1;
     int *ip;
-    if ((ip = rebx_get_param(rx, force->ap, "pn_1PN" ))) do1PN  = *ip;
     if ((ip = rebx_get_param(rx, force->ap, "pn_15PN"))) do15PN = *ip;
     if ((ip = rebx_get_param(rx, force->ap, "pn_2PN" ))) do2PN  = *ip;
     if ((ip = rebx_get_param(rx, force->ap, "pn_25PN"))) do25PN = *ip;
 
     rebx_calculate_post_newtonian(sim, particles, N, *c_ptr,
-                                  do1PN, do15PN, do2PN, do25PN);
+                                  do15PN, do2PN, do25PN);
 }
