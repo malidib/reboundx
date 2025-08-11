@@ -14,7 +14,7 @@ print("Default main-sequence scaling:")
 for i in range(5):
     sim.integrate(sim.t+1e3)
     R = sim.particles[0].r
-    L = sim.particles[0].params['swml_L']
+    L = sim.particles[0].params['sse_L']
     print(f"t={sim.t:.0f} yr, R={R:.4f} Rsun, L={L:.4f} Lsun")
 
 # Customize parameters
@@ -31,7 +31,7 @@ print("Default main-sequence evolution:")
 for i in range(5):
     sim.integrate(sim.t+1e3)
     R = sim.particles[0].r
-    L = sim.particles[0].params['swml_L']
+    L = sim.particles[0].params['sse_L']
     print(f"t={sim.t:.0f} yr, R={R:.4f} Rsun, L={L:.4f} Lsun")
 
 # Customize parameters
@@ -49,5 +49,5 @@ print("\nCustom parameters:")
 for i in range(5):
     sim.integrate(sim.t+1e3)
     R = sim.particles[0].r
-    L = sim.particles[0].params['swml_L']
+    L = sim.particles[0].params['sse_L']
     print(f"t={sim.t:.0f} yr, R={R:.4f} Rsun, L={L:.4f} Lsun")
