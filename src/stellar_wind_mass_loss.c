@@ -20,7 +20,7 @@
  * -------------------------
  *  swml_eta    (double, required)  – dimensionless efficiency η
  *  swml_L      (double, required)  – stellar luminosity  (same units as Lsun)
- *  swml_R      (double, required)  – stellar radius      (same units as Rsun)
+ *  (stellar radius is taken from the particle's radius r)
  *
  * Notes
  * -----
@@ -77,13 +77,12 @@ void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
         /* Fetch particle parameters */
         const double* eta_ptr = rebx_get_param(rx, p->ap, "swml_eta");
         const double* L_ptr   = rebx_get_param(rx, p->ap, "swml_L");
-        const double* R_ptr   = rebx_get_param(rx, p->ap, "swml_R");
 
-        if (!eta_ptr || !L_ptr || !R_ptr) continue;
+        if (!eta_ptr || !L_ptr) continue;
 
         const double eta = *eta_ptr;
         const double L   = *L_ptr;
-        const double R   = *R_ptr;
+        const double R   = p->r;
 
         /* Sanity checks */
         if (!isfinite(eta) || eta <= 0.0) continue;

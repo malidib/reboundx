@@ -20,6 +20,7 @@ int main(int argc, char* argv[]){
 
     struct reb_particle star = {0};
     star.m = 1.;
+    star.r = 1.0; // Rsun
     reb_simulation_add(sim, star);
     reb_simulation_move_to_com(sim);
 
@@ -29,7 +30,6 @@ int main(int argc, char* argv[]){
 
     // set stellar parameters
     rebx_set_param_double(rebx, &sim->particles[0].ap, "swml_eta", 0.5);
-    rebx_set_param_double(rebx, &sim->particles[0].ap, "swml_R", 1.0); // Rsun
     rebx_set_param_double(rebx, &sim->particles[0].ap, "swml_L", 1.0); // Lsun
 
     reb_simulation_integrate(sim, tmax);
