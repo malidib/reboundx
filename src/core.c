@@ -201,6 +201,7 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "sse_R_exp", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_L_coeff", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "sse_L_exp", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "sse_L", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "mb_on", REBX_TYPE_INT);
     rebx_register_param(rebx, "mb_convective", REBX_TYPE_INT);
     rebx_register_param(rebx, "mb_omega_sat", REBX_TYPE_DOUBLE);
@@ -487,12 +488,12 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
         operator->step_function = rebx_stellar_evolution_sse;
         operator->operator_type = REBX_OPERATOR_UPDATER;
         // Ensure a default luminosity parameter exists for all particles so
-        // other effects (e.g., stellar winds) can immediately access it.
+        // other effects can immediately access it.
         struct reb_simulation* const sim = rebx->sim;
         for (int i = 0; i < sim->N; i++){
             struct reb_particle* const p = &sim->particles[i];
-            if (!rebx_get_param(rebx, p->ap, "swml_L")){
-                rebx_set_param_double(rebx, &p->ap, "swml_L", 1.0);
+            if (!rebx_get_param(rebx, p->ap, "sse_L")){
+                rebx_set_param_double(rebx, &p->ap, "sse_L", 1.0);
             }
         }
     }

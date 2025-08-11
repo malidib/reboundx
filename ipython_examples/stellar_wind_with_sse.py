@@ -23,5 +23,5 @@ for i in range(5):
     sim.integrate(sim.t + 2e10)
     M = sim.particles[0].m
     R = sim.particles[0].r
-    L = sim.particles[0].params['swml_L']
+    L = sim.particles[0].params['sse_L']
     print(f"t={sim.t:.0f} yr, M={M:.6f} Msun, R={R:.3f} Rsun, L={L:.3f} Lsun")

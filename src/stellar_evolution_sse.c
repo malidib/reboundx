@@ -74,6 +74,6 @@ void rebx_stellar_evolution_sse(struct reb_simulation* const sim, struct rebx_op
         double R = R_coeff * Rsun * pow(mass_ratio, R_exp);
         double L = L_coeff * Lsun * pow(mass_ratio, L_exp);
         p->r = R;
-        rebx_set_param_double(rebx, &p->ap, "swml_L", L);
+        rebx_set_param_double(rebx, &p->ap, "sse_L", L);
     }
 }

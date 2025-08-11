@@ -33,7 +33,7 @@ int main(int argc, char* argv[]){
         reb_simulation_integrate(sim, (i+1)*tmax/10.);
         printf("t=%e R=%f L=%f\n", sim->t,
                sim->particles[0].r,
-               *rebx_get_param(rebx, sim->particles[0].ap, "swml_L"));
+               *rebx_get_param(rebx, sim->particles[0].ap, "sse_L"));
     }
 
     rebx_free(rebx);
