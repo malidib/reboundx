@@ -302,8 +302,9 @@ $R$, the mass-loss rate is
 \dot M = -4\times10^{-13}\,\eta\,\frac{L}{L_\odot}\frac{R}{R_\odot}\frac{M_\odot}{M}
 \;M_\odot\,\mathrm{yr}^{-1},
 \]
-where the dimensionless efficiency $\eta$ together with $L$ and $R$ are
-specified per particle. Mass is removed isotropically with no linear-momentum
+where the dimensionless efficiency $\eta$ and luminosity $L$ are
+specified per particle, while $R$ is taken from the particle's radius field.
+Mass is removed isotropically with no linear-momentum
 recoil; virtual particles are ignored and after mass loss the system is
 recentred on the centre of mass.  A safety limiter caps the fractional
 mass change to \texttt{swml\_max\_dlnM} (default $0.1$) per call.  The
@@ -319,8 +320,7 @@ operator parameters (Table~\ref{tab:swml}).
 Name (scope) & Unit & Default & Purpose \\
 \midrule
 \texttt{swml\_eta} (part) & — & — & Wind efficiency $\eta$\\
-\texttt{swml\_L}   (part) & luminosity & — & Stellar luminosity $L$\\
-\texttt{swml\_R}   (part) & length & — & Stellar radius $R$\\[0.2em]
+\texttt{swml\_L}   (part) & luminosity & — & Stellar luminosity $L$\\[0.2em]
 \texttt{swml\_const} (op) & $M_\odot$/yr & $4\times10^{-13}$ & Reimers prefactor\\
 \texttt{swml\_Msun}  (op) & mass & 1 & Solar mass in code units\\
 \texttt{swml\_Rsun}  (op) & length & 1 & Solar radius in code units\\
@@ -335,22 +335,23 @@ Name (scope) & Unit & Default & Purpose \\
 \label{sec:tdw}
 
 Thermal pressure can launch isotropic winds that carry away mass. For a star
-of mass $M$, coronal temperature $T$, and radius $R$, we adopt a Parker-like
-scaling
+of mass $M$, luminosity $L$, and radius $R$, we adopt a Parker-like scaling
 \[
 \dot M = -C_{\rm th}\,\eta\,\left(\frac{R}{R_\odot}\right)^{\alpha_R}
-                   \left(\frac{T}{T_\odot}\right)^{\alpha_T}
+                   \left(\frac{L}{L_\odot}\right)^{\alpha_L}
                    \left(\frac{M_\odot}{M}\right)^{\alpha_M}
 \;M_\odot\,\mathrm{yr}^{-1},
 \]
 where $\eta$ is a dimensionless heating efficiency and the exponents have
-defaults $(\alpha_R,\alpha_T,\alpha_M)=(2,\tfrac{3}{2},1)$.  Mass is removed
-isotropically with no linear-momentum recoil; virtual particles are ignored,
-and after mass loss the system is recentred on the centre of mass.  The
-prefactor, solar reference values, exponents, maximum fractional mass change
-per call, and the year length can be adjusted via operator parameters
-(Table~\ref{tab:tdw}). The operator is unit-agnostic if these scaling
-constants are specified consistently.
+defaults $(\alpha_R,\alpha_L,\alpha_M)=(2,\tfrac{3}{2},1)$.  The luminosity
+$L$ is read from the particle attribute \texttt{sse\_L}, while $R$ and $M$ are
+taken from the particle's $r$ and $m$ fields. Mass is removed isotropically
+with no linear-momentum recoil; virtual particles are ignored, and after mass
+loss the system is recentred on the centre of mass.  The prefactor, solar
+reference values, exponents, maximum fractional mass change, and the year
+length can be adjusted via operator parameters (Table~\ref{tab:tdw}). The
+operator is unit-agnostic if these scaling constants are specified
+consistently.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -361,15 +362,14 @@ constants are specified consistently.
 Name (scope) & Unit & Default & Purpose \\
 \midrule
 \texttt{tdw\_eta} (part) & — & — & Wind efficiency $\eta$\\
-\texttt{tdw\_T}   (part) & temperature & — & Coronal temperature $T$\\
-\texttt{tdw\_R}   (part) & length & — & Stellar radius $R$\\[0.2em]
+\texttt{sse\_L}   (part) & luminosity & — & Stellar luminosity $L$\\[0.2em]
 \texttt{tdw\_const} (op) & $M_\odot$/yr & $2\times10^{-14}$ & Thermal-wind prefactor $C_{\rm th}$\\
 \texttt{tdw\_Msun}  (op) & mass & 1 & Solar mass in code units\\
 \texttt{tdw\_Rsun}  (op) & length & 1 & Solar radius in code units\\
-\texttt{tdw\_Tsun}  (op) & temperature & $1.5\times10^6$ & Reference corona $T_\odot$ in code units\\
+\texttt{tdw\_Lsun}  (op) & luminosity & 1 & Reference luminosity $L_\odot$ in code units\\
 \texttt{tdw\_year}  (op) & time & 1 & Length of Julian year in code units\\
 \texttt{tdw\_alpha\_R} (op) & — & 2 & Exponent $\alpha_R$ on $R/R_\odot$\\
-\texttt{tdw\_alpha\_T} (op) & — & $3/2$ & Exponent $\alpha_T$ on $T/T_\odot$\\
+\texttt{tdw\_alpha\_L} (op) & — & $3/2$ & Exponent $\alpha_L$ on $L/L_\odot$\\
 \texttt{tdw\_alpha\_M} (op) & — & 1 & Exponent $\alpha_M$ on $M_\odot/M$\\
 \texttt{tdw\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
 \bottomrule
