@@ -11,17 +11,16 @@ class TestStellarWinds(unittest.TestCase):
         sim.add(m=1.0, r=1.0)
 
         rebx = reboundx.Extras(sim)
+        sse = rebx.load_operator('stellar_evolution_sse')
+        rebx.add_operator(sse)
         swml = rebx.load_operator('stellar_wind_mass_loss')
         rebx.add_operator(swml)
         tdw = rebx.load_operator('thermally_driven_winds')
         rebx.add_operator(tdw)
-        sse = rebx.load_operator('stellar_evolution_sse')
-        rebx.add_operator(sse)
 
         star = sim.particles[0]
         star.params['swml_eta'] = 0.5
         star.params['tdw_eta'] = 1.0
-        star.params['tdw_T'] = 1.5e6
 
         initial_mass = star.m
         for _ in range(5):

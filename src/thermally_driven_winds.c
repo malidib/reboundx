@@ -4,25 +4,25 @@
  *
  * Default scaling (Parker‑like)
  *   dM/dt = - C_th * η *
- *           (R/R☉)^{α_R} (T/T☉)^{α_T} (M☉/M)^{α_M}  [M☉ yr⁻¹] .
+ *           (R/R☉)^{α_R} (L/L☉)^{α_L} (M☉/M)^{α_M}  [M☉ yr⁻¹] .
  *
  * Operator‑level parameters
  * -------------------------
  *  tdw_const      (double)  – C_th, prefactor in M☉ yr⁻¹            (def: 2e‑14)
  *  tdw_Msun       (double)  – solar mass    in code units           (def: 1)
  *  tdw_Rsun       (double)  – solar radius  in code units           (def: 1)
- *  tdw_Tsun       (double)  – reference corona T in code units      (def: 1.5e6)
+ *  tdw_Lsun       (double)  – reference luminosity in code units    (def: 1)
  *  tdw_year       (double)  – Julian year in code‑time units        (def: 1)
  *  tdw_alpha_R    (double)  – exponent α_R                          (def: 2)
- *  tdw_alpha_T    (double)  – exponent α_T                          (def: 1.5)
+ *  tdw_alpha_L    (double)  – exponent α_L                          (def: 1.5)
  *  tdw_alpha_M    (double)  – exponent α_M                          (def: 1)
  *  tdw_max_dlnM   (double)  – max |ΔM|/M per call (safety limiter)   (def: 0.1)
  *
  * Particle‑level parameters
  * -------------------------
  *  tdw_eta        (double, req.) – heating efficiency η
- *  tdw_T          (double, req.) – coronal temperature  (same units as Tsun)
- *  (stellar radius is taken from the particle's radius r)
+ *  sse_L          (double, req.) – stellar luminosity (same units as Lsun)
+ *  (stellar mass and radius are taken from the particle's m and r fields)
  *
  * Notes
  * -----
@@ -51,12 +51,12 @@ void rebx_thermally_driven_winds(struct reb_simulation* const sim,
     /* ---------------- operator‑level parameters ------------------------ */
     double Msun      = 1.0;
     double Rsun      = 1.0;
-    double Tsun      = 1.5e6;          /* K – typical solar coronal T      */
+    double Lsun      = 1.0;            /* reference luminosity             */
     double C0        = 2.0e-14;        /* M☉ yr⁻¹  → matches solar wind    */
     double year_len  = 1.0;
 
     double aR = 2.0;                   /* Parker: surface area             */
-    double aT = 1.5;                   /* Parker: ρ_b c_s ∝ T^{3/2}        */
+    double aL = 1.5;                   /* luminosity scaling               */
     double aM = 1.0;                   /* escape‑speed scaling             */
     double max_dlnM = 0.1;             /* safety: 10 % per call            */
 
@@ -68,11 +68,11 @@ void rebx_thermally_driven_winds(struct reb_simulation* const sim,
 
     GET("tdw_Msun"    , Msun     );
     GET("tdw_Rsun"    , Rsun     );
-    GET("tdw_Tsun"    , Tsun     );
+    GET("tdw_Lsun"    , Lsun     );
     GET("tdw_const"   , C0       );
     GET("tdw_year"    , year_len );
     GET("tdw_alpha_R" , aR       );
-    GET("tdw_alpha_T" , aT       );
+    GET("tdw_alpha_L" , aL       );
     GET("tdw_alpha_M" , aM       );
     GET("tdw_max_dlnM", max_dlnM );
     #undef GET
@@ -85,24 +85,24 @@ void rebx_thermally_driven_winds(struct reb_simulation* const sim,
         struct reb_particle* const p = &sim->particles[i];
 
         const double* eta_ptr = rebx_get_param(rx, p->ap, "tdw_eta");
-        const double* T_ptr   = rebx_get_param(rx, p->ap, "tdw_T");
-        if (!eta_ptr || !T_ptr) continue;
+        const double* L_ptr   = rebx_get_param(rx, p->ap, "sse_L");
+        if (!eta_ptr || !L_ptr) continue;
 
         const double eta = *eta_ptr;
-        const double T   = *T_ptr;
+        const double L   = *L_ptr;
         const double R   = p->r;
         if (eta <= 0.0 || !isfinite(eta)) continue;
-        if (T   <= 0.0 || !isfinite(T  )) continue;
+        if (L   <= 0.0 || !isfinite(L  )) continue;
         if (R   <= 0.0 || !isfinite(R  )) continue;
         if (p->m <= 0.0 || !isfinite(p->m)) continue;
 
         /* Dimensionless ratios and powers */
         const double RR = pow_safe(R / Rsun, aR);
-        const double TT = pow_safe(T / Tsun, aT);
+        const double LL = pow_safe(L / Lsun, aL);
         const double MM = pow_safe(Msun / p->m, aM);
 
         /* Mass‑loss rate (code units) */
-        const double mdot = -pref * eta * RR * TT * MM;
+        const double mdot = -pref * eta * RR * LL * MM;
 
         /* Safety limiter */
         const double dM_lim = -max_dlnM * p->m;            /* negative value   */
