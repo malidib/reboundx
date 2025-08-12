@@ -107,7 +107,9 @@ The donor’s instantaneous mass‑loss rate follows
 \label{eq:Ritter}
 \end{equation}
 with the exponent clamped to $\le80$ to avoid floating‑point overflow
-(\texttt{RLMT\_EXP\_CLAMP}).
+(\texttt{RLMT\_EXP\_CLAMP}). The donor must supply the pressure scale height
+$H_P$ and reference rate $\dot M_0$ through the particle parameters
+\texttt{rlmt\_Hp} and \texttt{rlmt\_mdot0}.
 
 \paragraph{Envelope veto.} If \texttt{rlmt\_skip\_in\_CE}=1\ (the default), the RLOF calculation is bypassed whenever the accretor resides inside the donor’s radius ($r<R_*$), allowing common‑envelope drag to dominate.
 
@@ -191,7 +193,9 @@ I(\mathcal M)=
 \end{equation}
 For $\mathcal M<1$ the implementation additionally caps the result at
 $\ln(1/x_{\min})$,
-ensuring $I(\mathcal M)\le\ln(1/x_{\min})$ in \emph{all} regimes.
+ensuring $I(\mathcal M)\le\ln(1/x_{\min})$ in \emph{all} regimes. The
+cutoff $x_{\min}$ is set by the operator parameter \texttt{ce\_xmin}
+(default $10^{-4}$).
 
 \paragraph{Hydrodynamic accretion term (optional).}
 If \texttt{ce\_Qd}$>$0 and the accretor's radius $R_{\mathrm acc}$ (taken from its
@@ -344,8 +348,10 @@ of mass $M$, luminosity $L$, and radius $R$, we adopt a Parker-like scaling
 \]
 where $\eta$ is a dimensionless heating efficiency and the exponents have
 defaults $(\alpha_R,\alpha_L,\alpha_M)=(2,\tfrac{3}{2},1)$.  The luminosity
-$L$ is read from the particle attribute \texttt{sse\_L}, while $R$ and $M$ are
-taken from the particle's $r$ and $m$ fields. Mass is removed isotropically
+$L$ is read from the particle attribute \texttt{sse\_L}, which must be
+populated either by the simplified stellar‑evolution operator or manually by
+the user, while $R$ and $M$ are taken from the particle's $r$ and $m$ fields.
+Mass is removed isotropically
 with no linear-momentum recoil; virtual particles are ignored, and after mass
 loss the system is recentred on the centre of mass.  The prefactor, solar
 reference values, exponents, maximum fractional mass change, and the year
@@ -395,8 +401,9 @@ particle-level parameters \texttt{sse\_R\_coeff}, \texttt{sse\_R\_exp},
 \texttt{sse\_L\_coeff}, and \texttt{sse\_L\_exp}; if unspecified, the default
 values in Table~\ref{tab:sse} are applied.  The particle's radius field is
 replaced by $R$, and the luminosity $L$ is written to the attribute
-\texttt{sse\_L}. Virtual particles are skipped, and stellar masses remain
-unchanged.
+\texttt{sse\_L}. This stored luminosity can be used by other modules such as
+the thermally driven wind operator. Virtual particles are skipped, and stellar
+masses remain unchanged.
 
 \begin{table}[h]
 \centering\footnotesize
