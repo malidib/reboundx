@@ -189,6 +189,13 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "tdw_alpha_L", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "tdw_alpha_M", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "tdw_max_dlnM", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_L", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_const", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_Msun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_Lsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_LEdd_coeff", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_year", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "eddw_max_dlnM", REBX_TYPE_DOUBLE);
     // Simplified stellar evolution operator
     // Global constants
     rebx_register_param(rebx, "sse_Msun", REBX_TYPE_DOUBLE);
@@ -480,6 +487,10 @@ struct rebx_operator* rebx_load_operator(struct rebx_extras* const rebx, const c
     }
     else if (strcmp(name, "thermally_driven_winds") == 0){
         operator->step_function = rebx_thermally_driven_winds;
+        operator->operator_type = REBX_OPERATOR_UPDATER;
+    }
+    else if (strcmp(name, "eddington_winds") == 0){
+        operator->step_function = rebx_eddington_winds;
         operator->operator_type = REBX_OPERATOR_UPDATER;
     }
     else if (strcmp(name, "stellar_evolution_sse") == 0){

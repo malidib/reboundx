@@ -87,6 +87,7 @@ void rebx_lense_thirring(struct reb_simulation* const sim, struct rebx_force* co
 void rebx_modify_mass(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_thermally_driven_winds(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
+void rebx_eddington_winds(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 // Simplified stellar evolution; scaling parameters live on particles
 void rebx_stellar_evolution_sse(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
 void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim, struct rebx_operator* const operator, const double dt);
