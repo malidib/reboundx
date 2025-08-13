@@ -552,6 +552,43 @@ swml_L   (double)            Yes         Stellar luminosity
 swml_R   (double)            Yes         Stellar radius
 ============================ =========== ======================================
 
+.. _eddington_winds:
+
+eddington_winds
+***************
+
+======================= ===============================================
+Authors                 ChatGPT
+Implementation Paper    None
+Based on                Eddington limit
+C Example               :ref:`c_example_eddington_winds`
+Python Example          `eddington_winds.py <https://github.com/dtamayo/reboundx>`_
+======================= ===============================================
+
+Applies isotropic mass loss when a star's luminosity exceeds its
+Eddington luminosity.
+
+**Effect Parameters**
+
+============================ =========== ==================================================================
+Field (C type)               Required    Description
+============================ =========== ==================================================================
+eddw_const (double)          No          Prefactor in Msun/yr (default 1e-5)
+eddw_Msun  (double)          No          Solar mass in code units
+eddw_Lsun  (double)          No          Solar luminosity in code units
+eddw_LEdd_coeff (double)     No          Coefficient for L_Edd in Lsun (default 3.2e4)
+eddw_year  (double)          No          Julian year in code-time units
+eddw_max_dlnM (double)       No          Max |ΔM|/M per call (default 0.1)
+============================ =========== ==================================================================
+
+**Particle Parameters**
+
+============================ =========== ==================================================================
+Field (C type)               Required    Description
+============================ =========== ==================================================================
+eddw_L   (double)            Yes         Stellar luminosity
+============================ =========== ==================================================================
+
 .. _stellar_evolution_sse:
 
 stellar_evolution_sse
