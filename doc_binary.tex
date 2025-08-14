@@ -24,12 +24,13 @@
 
 \title{\textsc{Binary‑Star Evolution Modules in
          \textnormal{REBOUNDx}}:\\
-       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, Thermally Driven Winds, Simplified
-       Stellar Evolution, and Relativity}
+       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, Thermally Driven Winds, Eddington Winds,
+       Simplified Stellar Evolution, and Relativity}
 \author{Operator files: \texttt{roche\_lobe\_mass\_transfer.c},
         \texttt{magnetic\_braking.c},
         \texttt{stellar\_wind\_mass\_loss.c},
         \texttt{thermally\_driven\_winds.c},
+        \texttt{eddington\_winds.c},
         \texttt{stellar\_evolution\_sse.c},
         \texttt{post\_newtonian.c}\\
         Revision B – 10 July 2025}
@@ -378,6 +379,45 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{tdw\_alpha\_L} (op) & — & $3/2$ & Exponent $\alpha_L$ on $L/L_\odot$\\
 \texttt{tdw\_alpha\_M} (op) & — & 1 & Exponent $\alpha_M$ on $M_\odot/M$\\
 \texttt{tdw\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Eddington Winds}
+\label{sec:edw}
+
+Luminosities that exceed the electron-scattering Eddington limit can drive
+isotropic mass loss. For a star of mass $M$ and luminosity $L$, the rate is
+\[
+\dot M = -C_{\rm edd}\,\max\!\left(0, \frac{L}{L_{\rm Edd}} - 1\right)
+\;M_\odot\,\mathrm{yr}^{-1},
+\]
+where $L_{\rm Edd} = L_{\rm Edd,0}(M/M_\odot)L_\odot$ with the coefficient
+$L_{\rm Edd,0}$ set by the operator parameter \texttt{edw\_Ledd\_coeff}. The
+luminosity $L$ must be provided via the particle attribute \texttt{sse\_L},
+for example by the simplified stellar-evolution operator. Mass is removed
+isotropically with no linear-momentum recoil; virtual particles are ignored
+and the system is recentred on the centre of mass. The normalisation,
+unit conversions, Eddington coefficient, year length, and safety cap on
+the fractional mass change are adjustable via operator parameters
+summarised in Table~\ref{tab:edw}. The operator is unit-agnostic if the
+scaling constants are supplied consistently.
+
+\begin{table}[h]
+\centering\footnotesize
+\caption{Eddington wind parameters}
+\label{tab:edw}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Name (scope) & Unit & Default & Purpose \\
+\midrule
+\texttt{sse\_L} (part) & luminosity & — & Stellar luminosity $L$\\[0.2em]
+\texttt{edw\_const} (op) & $M_\odot$/yr & $10^{-6}$ & Mass-loss prefactor $C_{\rm edd}$\\
+\texttt{edw\_Msun} (op) & mass & 1 & Solar mass in code units\\
+\texttt{edw\_Lsun} (op) & luminosity & 1 & Solar luminosity in code units\\
+\texttt{edw\_year} (op) & time & 1 & Length of Julian year in code units\\
+\texttt{edw\_Ledd\_coeff} (op) & $L_\odot/M_\odot$ & $3.2\times10^{4}$ & Eddington coefficient\\
+\texttt{edw\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
 \bottomrule
 \end{tabular}
 \end{table}
