@@ -2,11 +2,15 @@
  * @file    magnetic_braking.c
  * @brief   Verbunt–Zwaan / Kawaler magnetic‑braking torque with saturation.
  *
- * dJ/dt = -K R^{1/2} M^{-1/2} ×
- *         { Ω^3                     , Ω ≤ Ω_sat
- *         { Ω Ω_sat^2              , Ω > Ω_sat
+ * Implements
  *
- * where K, R, M are in consistent units.
+ *   dJ/dt = -K * (R/Rsun)^{1/2} * (M/Msun)^{-1/2} *
+ *           { ω^3                   , ω ≤ ω_sat
+ *           { ω * ω_sat^2          , ω > ω_sat
+ *
+ * with K specified in cgs and internally converted to code units.
+ * The update for |Ω| uses closed-form, positivity‑preserving formulas in
+ * both regimes (and piecewise when the step crosses the saturation threshold).
  *
  * Particle‑level parameters  (all scalars are stored as double in REBOUNDx)
  * ------------------------------------------------------------------------
@@ -14,6 +18,7 @@
  * mb_convective  (double, required ≠0)  – star has a convective envelope
  * mb_omega_sat   (double, optional)     – saturation angular velocity
  * mb_tau_conv    (double, optional)     – convective turnover time
+ * mb_R           (double, optional)     – radius override (in code-length units)
  * I              (double, required)     – moment of inertia
  * Omega          (reb_vec3d, required)  – spin angular‑velocity vector
  *
@@ -28,22 +33,38 @@
  * mb_year        (double, optional)     – Julian year in code‑time units
  *                                             (default 1).
  * mb_Rossby_sat  (double, optional)     – critical Rossby number for
- *                                         saturation (default 0.1)
+ *                                         saturation (default 0.1).
  *
- * All quantities are automatically converted to the simulation's unit
- * system; users need not manually rescale ``mb_K``.
-*/
+ * Notes
+ * -----
+ *  - The conversion of K is consistent with the dimensionful form
+ *        dJ/dt = -K * (...) * ω^3
+ *    where (...) uses dimensionless (R/Rsun)^{1/2}(M/Msun)^{-1/2} and ω is in
+ *    code 1/time. This yields K_code = K_cgs / (M_unit * L_unit^2 * T_unit),
+ *    with (M_unit, L_unit, T_unit) the cgs-per-code base units.
+ *  - The Ω update is closed-form and strictly positive; no “flip prevention”
+ *    guard is needed.
+ */
 
 #include <math.h>
 #include <stdio.h>
 #include "rebound.h"
 #include "reboundx.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+/* ------------------------------------------------------------------------- */
+/* Internal helper: apply braking to a single particle                       */
+/* ------------------------------------------------------------------------- */
 static inline void apply_magnetic_brake(struct reb_particle*    const p,
                                         struct rebx_extras*     const rx,
-                                        const double            K,
-                                        const double            dt,
-                                        const double            Rossby_sat)
+                                        const double            K_fac,        /* K in code units */
+                                        const double            dt,           /* code time step */
+                                        const double            Rossby_sat,   /* critical Rossby number */
+                                        const double            Msun_code,    /* solar mass in code units */
+                                        const double            Rsun_code)    /* solar radius in code units */
 {
     /* ----------------------- fetch flags & properties ------------------- */
     const double* mb_on  = rebx_get_param(rx, p->ap, "mb_on");
@@ -58,39 +79,93 @@ static inline void apply_magnetic_brake(struct reb_particle*    const p,
     struct reb_vec3d* Omega = rebx_get_param_vec(rx, p->ap, "Omega");
     if (!Omega) return;
 
-    const double R = p->r;
-    const double M = p->m;
-    if (R <= 0.0 || M <= 0.0 || !isfinite(R) || !isfinite(M)) return;
+    /* Radius: optional per‑particle override, otherwise use particle radius */
+    const double* Rptr = rebx_get_param(rx, p->ap, "mb_R");
+    const double R = (Rptr && isfinite(*Rptr) && *Rptr > 0.0) ? *Rptr : p->r;
 
-    const double omega = sqrt(Omega->x*Omega->x + Omega->y*Omega->y + Omega->z*Omega->z);
+    const double M = p->m;
+
+    if (!(isfinite(R) && R > 0.0)) return;
+    if (!(isfinite(M) && M > 0.0)) return;
+    if (!(isfinite(Msun_code) && Msun_code > 0.0)) return;
+    if (!(isfinite(Rsun_code) && Rsun_code > 0.0)) return;
+
+    const double ox = Omega->x, oy = Omega->y, oz = Omega->z;
+    const double omega = sqrt(ox*ox + oy*oy + oz*oz);
     if (!isfinite(omega) || omega == 0.0) return;
 
-    const double* sat_ptr   = rebx_get_param(rx, p->ap, "mb_omega_sat");
-    const double* tau_ptr   = rebx_get_param(rx, p->ap, "mb_tau_conv");
-    double omega_sat = INFINITY;
-    if (tau_ptr && *tau_ptr > 0.0 && isfinite(*tau_ptr)){
+    /* ------------------------- saturation threshold --------------------- */
+    const double* sat_ptr = rebx_get_param(rx, p->ap, "mb_omega_sat");
+    const double* tau_ptr = rebx_get_param(rx, p->ap, "mb_tau_conv");
+
+    double omega_sat = INFINITY;  /* default: no saturation */
+
+    if (tau_ptr && *tau_ptr > 0.0 && isfinite(*tau_ptr) &&
+        isfinite(Rossby_sat) && Rossby_sat > 0.0) {
         omega_sat = 2.0*M_PI/(Rossby_sat * (*tau_ptr));
     }
-    if (sat_ptr && *sat_ptr > 0.0 && isfinite(*sat_ptr))
-        omega_sat = *sat_ptr;
+    if (sat_ptr && *sat_ptr > 0.0 && isfinite(*sat_ptr)) {
+        omega_sat = *sat_ptr;     /* explicit override wins */
+    }
 
-    /* --------------------------- torque magnitude ----------------------- */
-    double omega_term = omega*omega*omega;          /* unsaturated default  */
-    if (omega > omega_sat)                          /* saturated regime     */
-        omega_term = omega * omega_sat * omega_sat;
+    /* --------------------------- prefactors ----------------------------- */
+    /* dimensionless ratios (R/Rsun)^{1/2} and (M/Msun)^{-1/2} */
+    const double Rfac = sqrt(R / Rsun_code);
+    const double Mfac = 1.0 / sqrt(M / Msun_code);
 
-    const double torque = -K * sqrt(R) * (1.0 / sqrt(M)) * omega_term;
+    /* Core coefficient C so that:
+       unsaturated: dω/dt = -C * ω^3
+       saturated:   dω/dt = -C * ω_sat^2 * ω
+     */
+    const double C = (K_fac * Rfac * Mfac) / (*I_ptr);
 
-    /* --------------------------- apply dΩ/dt ---------------------------- */
-    const double domega_dt = torque / (*I_ptr);     /* scalar rate (negative) */
-    const double scale     = 1.0 + (domega_dt / omega)*dt;
+    if (!(isfinite(C) && C >= 0.0)) return;           /* defensive: nothing to do */
+    if (!(isfinite(dt) && dt > 0.0)) return;
 
-    /* Prevent overshoot that could flip the spin */
-    if (scale <= 0.0){
-        fprintf(stderr, "[magnetic_braking] spin update skipped (dt too large, particle hash %u)\n", p->hash);
+    /* -------------------- closed-form magnitude update ------------------ */
+    double scale = 1.0;   /* multiplicative factor applied to Ω components */
+
+    const int has_sat   = isfinite(omega_sat);
+    const int in_sat    = has_sat && (omega > omega_sat);
+
+    if (!has_sat || !in_sat) {
+        /* Entire step unsaturated: ω' = ω / sqrt(1 + 2*C*ω^2*dt) */
+        const double denom = 1.0 + 2.0*C*omega*omega*dt;
+        if (!(denom > 0.0 && isfinite(denom))) return;
+        scale = 1.0 / sqrt(denom);
+    } else {
+        /* Start saturated: first decay exponentially until ω reaches ω_sat,
+           then continue with unsaturated law for the remainder of the step.
+         */
+        const double lambda = C * omega_sat * omega_sat;   /* > 0 */
+        if (!(isfinite(lambda) && lambda > 0.0)) return;
+
+        /* Time to reach ω_sat under saturated law: ω(t) = ω0 * exp(-λ t) */
+        const double t_cross = log(omega / omega_sat) / lambda;
+
+        if (!(isfinite(t_cross) && t_cross >= 0.0)) return;
+
+        if (dt <= t_cross) {
+            /* Entire step saturated */
+            scale = exp(-lambda * dt);
+        } else {
+            /* Saturated to ω_sat, then unsaturated for the remainder */
+            const double scale_sat  = exp(-lambda * t_cross);               /* = ω_sat / ω */
+            const double rem        = dt - t_cross;
+            const double denom_uns  = 1.0 + 2.0*C*omega_sat*omega_sat*rem;  /* unsat piece from ω_sat */
+            if (!(denom_uns > 0.0 && isfinite(denom_uns))) return;
+            const double scale_uns  = 1.0 / sqrt(denom_uns);
+            scale = scale_sat * scale_uns;   /* total multiplicative change */
+        }
+    }
+
+    if (!(isfinite(scale) && scale > 0.0)) {
+        /* Should not happen with closed-form formulas, but be safe. */
+        fprintf(stderr, "[magnetic_braking] invalid scale (particle hash %u)\n", p->hash);
         return;
     }
 
+    /* --------------------------- apply scaling -------------------------- */
     Omega->x *= scale;
     Omega->y *= scale;
     Omega->z *= scale;
@@ -103,42 +178,48 @@ void rebx_magnetic_braking(struct reb_simulation* const sim,
                            struct rebx_operator*   const op,
                            const double                   dt)
 {
+    if (!(isfinite(dt) && dt > 0.0)) return;
+
     struct rebx_extras* const rx = sim->extras;
     const int N = sim->N;
 
     /* Operator‑level parameters */
-    double Msun = 1.0;   /* code‑mass units per solar mass  */
-    double Rsun = 1.0;   /* code‑length units per solar radius */
-    double year = 1.0;   /* code‑time units per Julian year */
+    double Msun_code = 1.0;   /* solar mass in code‑mass units  */
+    double Rsun_code = 1.0;   /* solar radius in code‑length units */
+    double year_code = 1.0;   /* Julian year in code‑time units */
 
-    const double* pM = rebx_get_param(rx, op->ap, "mb_Msun");
-    const double* pR = rebx_get_param(rx, op->ap, "mb_Rsun");
-    const double* pY = rebx_get_param(rx, op->ap, "mb_year");
-    const double* K_ptr = rebx_get_param(rx, op->ap, "mb_K");
+    const double* pM   = rebx_get_param(rx, op->ap, "mb_Msun");
+    const double* pR   = rebx_get_param(rx, op->ap, "mb_Rsun");
+    const double* pY   = rebx_get_param(rx, op->ap, "mb_year");
+    const double* pK   = rebx_get_param(rx, op->ap, "mb_K");
+    const double* pRo  = rebx_get_param(rx, op->ap, "mb_Rossby_sat");
 
-    if (pM && isfinite(*pM) && *pM > 0.0) Msun = *pM;
-    if (pR && isfinite(*pR) && *pR > 0.0) Rsun = *pR;
-    if (pY && isfinite(*pY) && *pY > 0.0) year = *pY;
+    if (pM && isfinite(*pM) && *pM > 0.0) Msun_code = *pM;
+    if (pR && isfinite(*pR) && *pR > 0.0) Rsun_code = *pR;
+    if (pY && isfinite(*pY) && *pY > 0.0) year_code = *pY;
 
-    const double K_cgs = (K_ptr && isfinite(*K_ptr) && *K_ptr > 0.0)
-                            ? *K_ptr : 2.7e47;
+    const double K_cgs = (pK && isfinite(*pK) && *pK > 0.0) ? *pK : 2.7e47;
 
-    /* Convert prefactor to code units */
-    const double Msun_cgs = 1.98847e33;
-    const double Rsun_cgs = 6.957e10;
-    const double year_cgs = 3.15576e7;
-    const double M_unit   = Msun_cgs / Msun;      /* [g/code-mass] */
-    const double L_unit   = Rsun_cgs / Rsun;      /* [cm/code-length] */
-    const double T_unit   = year_cgs / year;      /* [s/code-time] */
-    const double K = K_cgs / (pow(M_unit,1.5) * pow(L_unit,1.5) * T_unit);
+    /* Convert K from cgs to code units for:
+       dJ/dt = -K_fac * (R/Rsun)^{1/2} (M/Msun)^{-1/2} ω^3.
+       Dimensional analysis gives [K] = M L^2 T.
+       => K_code = K_cgs / (M_unit * L_unit^2 * T_unit).
+     */
+    const double Msun_cgs = 1.98847e33;   /* g  */
+    const double Rsun_cgs = 6.957e10;     /* cm */
+    const double year_cgs = 3.15576e7;    /* s  */
 
-    if (dt <= 0.0 || !isfinite(dt)) return;
+    const double M_unit = Msun_cgs / Msun_code;  /* [g / code‑mass] */
+    const double L_unit = Rsun_cgs / Rsun_code;  /* [cm / code‑length] */
+    const double T_unit = year_cgs / year_code;  /* [s / code‑time] */
+
+    const double K_fac = K_cgs / (M_unit * L_unit * L_unit * T_unit);
 
     double Rossby_sat = 0.1; /* default critical Rossby number */
-    const double* Ro_ptr = rebx_get_param(rx, op->ap, "mb_Rossby_sat");
-    if (Ro_ptr && isfinite(*Ro_ptr) && *Ro_ptr > 0.0) Rossby_sat = *Ro_ptr;
+    if (pRo && isfinite(*pRo) && *pRo > 0.0) Rossby_sat = *pRo;
 
     for (int i = 0; i < N; i++){
-        apply_magnetic_brake(&sim->particles[i], rx, K, dt, Rossby_sat);
+        apply_magnetic_brake(&sim->particles[i], rx, K_fac, dt, Rossby_sat,
+                             Msun_code, Rsun_code);
     }
 }
