@@ -172,7 +172,6 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "ce_xmin", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ce_Qd", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_eta", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "swml_L", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_const", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Msun", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "swml_Rsun", REBX_TYPE_DOUBLE);
