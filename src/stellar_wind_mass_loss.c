@@ -19,8 +19,9 @@
  * Particle‑level parameters
  * -------------------------
  *  swml_eta    (double, required)  – dimensionless efficiency η
- *  swml_L      (double, required)  – stellar luminosity  (same units as Lsun)
- *  (stellar radius is taken from the particle's radius r)
+ *  (stellar radius is taken from the particle's radius r; stellar
+ *  luminosity is read from the ``sse_L`` parameter set by the
+ *  \ref stellar_evolution_sse.c "stellar evolution" operator.)
  *
  * Notes
  * -----
@@ -76,7 +77,7 @@ void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
 
         /* Fetch particle parameters */
         const double* eta_ptr = rebx_get_param(rx, p->ap, "swml_eta");
-        const double* L_ptr   = rebx_get_param(rx, p->ap, "swml_L");
+        const double* L_ptr   = rebx_get_param(rx, p->ap, "sse_L");
 
         if (!eta_ptr || !L_ptr) continue;
 
