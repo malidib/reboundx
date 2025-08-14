@@ -23,7 +23,7 @@
  *
  * Particle-level parameters
  * -------------------------
- *  edw_L or sse_L   (double, req.) – stellar luminosity (units of L☉)
+ *  sse_L           (double, req.) – stellar luminosity (units of L☉)
  *
  * Notes
  * -----
@@ -75,9 +75,8 @@ void rebx_eddington_winds(struct reb_simulation* const sim,
         struct reb_particle* const p = &sim->particles[i];
         if (p->m <= 0.0 || !isfinite(p->m)) continue;
 
-        /* Accept L from either edw_L or sse_L (SSE pipeline friendly) */
-        const double* Lp = rebx_get_param(rx, p->ap, "edw_L");
-        if (!Lp)         Lp = rebx_get_param(rx, p->ap, "sse_L");
+        /* Stellar luminosity supplied via sse_L (e.g. from SSE operator) */
+        const double* Lp = rebx_get_param(rx, p->ap, "sse_L");
         if (!Lp) continue;
 
         const double L = *Lp;

@@ -12,7 +12,7 @@ def test_eddington_mass_loss():
     rebx.add_operator(op)
 
     star = sim.particles[0]
-    star.params['eddw_L'] = 1e5
+    star.params['sse_L'] = 1e5
     m0 = star.m
     sim.integrate(1e3)
     assert star.m < m0
