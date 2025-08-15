@@ -47,7 +47,7 @@ systemic winds, and common‑envelope drag within a momentum‑conserving
 framework featuring adaptive sub‑stepping and robust merge guards.
 Separate operators implement magnetic braking, isotropic stellar‑wind
 mass loss, thermally driven winds, simplified stellar‑evolution scalings,
-and post‑Newtonian relativistic corrections up to 2.5PN order with spin--orbit and spin--spin couplings.  Equations are derived,
+and post‑Newtonian relativistic corrections up to 2.5PN order with spin--spin couplings; spin--orbit terms can be added via the \texttt{lense\_thirring} effect.  Equations are derived,
 parameters are tabulated, and algorithmic
 choices are clarified so that this document can serve as an archival,
 citable reference.
@@ -61,7 +61,7 @@ Close binary stars evolve under a tightly coupled set of physical processes that
 
 Capturing this multi-physics landscape with a single method remains challenging. Fully three dimensional hydrodynamic calculations can resolve RLOF streams and CE flows, but they are too expensive for long-term evolution or population-scale parameter studies. Conversely, rapid binary–evolution formalisms encode RLOF, winds, magnetic braking, and gravitational–wave losses through secular prescriptions that are efficient and predictive in isolation, yet they generally assume a two-body context and cannot natively account for higher–order gravitational dynamics (e.g., triples, resonant encounters, or cluster potentials) that can modulate or even trigger mass transfer. A complementary approach is to embed vetted secular and dissipative processes within a high-accuracy $N$-body integrator so that orbital dynamics, spin evolution, and mass exchange proceed self-consistently on a common timestep while preserving the bookkeeping demanded by conservation laws.
 
-This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF operator that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific–angular–momentum prescriptions for escaping gas, with optional donor mass–radius responses following power–law scalings \citep{Eggleton1983,Ritter1988,Hurley2000}; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections that add spin–orbit couplings at 1.5\,PN, conservative 2\,PN point–mass and spin–spin terms, and 2.5\,PN gravitational–wave radiation reaction \citep{Einstein1915,Peters1964,Kidder1995}. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
+This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF operator that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific–angular–momentum prescriptions for escaping gas, with optional donor mass–radius responses following power–law scalings \citep{Eggleton1983,Ritter1988,Hurley2000}; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections providing conservative 2\,PN point–mass and spin–spin terms and 2.5\,PN gravitational–wave radiation reaction \citep{Einstein1915,Peters1964,Kidder1995}; 1\,PN and spin--orbit (1.5\,PN) effects are available via the \texttt{gr\_full} and \texttt{lense\_thirring} modules. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
 
 Algorithmically, the RLOF/CE module tracks all linear–momentum channels associated with accretion and systemic mass loss and applies a minimal corrective kick to maintain angular–momentum consistency, while adaptive sub-stepping limits the fractional changes in mass and separation per internal step to ensure numerical stability near contact. CE drag is modeled with a Mach-number–dependent dynamical-friction prescription capped by a CFL-like limiter to avoid excessive velocity impulses \citep{Ostriker1999}. The wind and magnetic-braking operators act directly on particle masses and spin vectors, respectively, with safeguards against overshoot in the spin update. The PN module follows the harmonic-gauge two-body equations of motion \citep{Kidder1995} and is split into configurable orders, enabling controlled experiments that isolate conservative precession from dissipative inspiral.
 
@@ -130,7 +130,12 @@ recoil; virtual particles are ignored and after mass loss the system is
 recentred on the centre of mass.  A safety limiter caps the fractional
 mass change to \texttt{swml\_max\_dlnM} (default $0.1$) per call.  The
 prefactor, solar reference values, and the year length can be adjusted via
-operator parameters (Table~\ref{tab:swml}).
+operator parameters (Table~\ref{tab:swml}).  By default the operator
+suppresses winds when a particle is flagged as inside a common envelope or
+undergoing Roche–lobe overflow; the switches
+\texttt{swml\_disable\_in\_CE} and \texttt{swml\_disable\_in\_RLOF}
+control this behaviour by reading the per-particle flags
+\texttt{inside\_CE} and \texttt{rlof\_active}.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -147,6 +152,8 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{swml\_Lsun}  (op) & luminosity & 1 & Solar luminosity in code units\\
 \texttt{swml\_year}  (op) & time & 1 & Length of Julian year in code units\\
 \texttt{swml\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
+\texttt{swml\_disable\_in\_CE} (op) & bool & 1 & Skip if \texttt{inside\_CE}$>0$\\
+\texttt{swml\_disable\_in\_RLOF} (op) & bool & 1 & Skip if \texttt{rlof\_active}$>0$\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -174,6 +181,11 @@ reference values, exponents, maximum fractional mass change, and the year
 length can be adjusted via operator parameters (Table~\ref{tab:tdw}). The
 operator is unit-agnostic if these scaling constants are specified
 consistently.
+By default the operator suspends winds for stars marked as being inside a
+common envelope or undergoing active Roche--lobe overflow, as indicated by
+the per-particle flags \texttt{inside\_CE} and \texttt{rlof\_active}.  This
+behaviour is controlled by \texttt{tdw\_disable\_in\_CE} and
+\texttt{tdw\_disable\_in\_RLOF}.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -194,6 +206,8 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{tdw\_alpha\_L} (op) & — & $3/2$ & Exponent $\alpha_L$ on $L/L_\odot$\\
 \texttt{tdw\_alpha\_M} (op) & — & 1 & Exponent $\alpha_M$ on $M_\odot/M$\\
 \texttt{tdw\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
+\texttt{tdw\_disable\_in\_CE} (op) & bool & 1 & Skip if \texttt{inside\_CE}$>0$\\
+\texttt{tdw\_disable\_in\_RLOF} (op) & bool & 1 & Skip if \texttt{rlof\_active}$>0$\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -215,6 +229,10 @@ and after mass loss the system is recentred on the centre of mass. A limiter
 caps the fractional mass change at \texttt{edw\_max\_dlnM} per call. Operator
 parameters controlling the scaling constants are listed in
 Table~\ref{tab:edw}.
+By default the operator skips stars flagged as being inside a common envelope
+or undergoing Roche--lobe overflow, controlled by
+\texttt{edw\_disable\_in\_CE} and \texttt{edw\_disable\_in\_RLOF}, which read
+\texttt{inside\_CE} and \texttt{rlof\_active}.
 
 \begin{table}[h]
 \centering\footnotesize
@@ -231,6 +249,8 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{edw\_year}  (op) & time & 1 & Length of Julian year in code units\\
 \texttt{edw\_Ledd\_coeff} (op) & $L_\odot/M_\odot$ & $3.2\times10^{4}$ & $L_{\rm Edd}$ per unit mass\\
 \texttt{edw\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
+\texttt{edw\_disable\_in\_CE} (op) & bool & 1 & Skip if \texttt{inside\_CE}$>0$\\
+\texttt{edw\_disable\_in\_RLOF} (op) & bool & 1 & Skip if \texttt{rlof\_active}$>0$\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -424,7 +444,7 @@ The toggles \texttt{pn\_2PN}, and \texttt{pn\_25PN}
 Accelerations are built for the relative coordinate and split between bodies
 in proportion to their masses, preserving total linear momentum.
 Spin precession equations are not included; if spins are misaligned, the
-orbital dynamics include SO and SS forces with fixed spins.
+orbital dynamics include spin--spin forces with fixed spins.
 
 \paragraph{Effect on binary orbits.}
 The 2.5\,PN term removes orbital energy and angular momentum, driving a secular
@@ -514,6 +534,15 @@ R_{\rm d}(M) = R_{\rm ref}\left(\frac{M}{M_{\rm ref}}\right)^{\alpha_R},
 \]
 where \texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to
 the donor’s current values if not provided.
+
+\paragraph{Inter-module flags.}
+After each sub-step the operator writes the boolean attributes
+\texttt{inside\_CE} and \texttt{rlof\_active} on both donor and accretor.
+These indicate whether the accretor lies within the donor's radius and
+whether the RLOF channel is actively removing mass. Other effects, such as
+stellar winds, inspect these flags (in conjunction with their own disable
+switches) to suspend their action during common-envelope phases or while
+RLOF is operating.
 
 \subsubsection{Common–Envelope (CE) Drag}
 When the accretor is inside the donor ($r<R_\ast$), the code can apply
