@@ -12,6 +12,15 @@
 \usepackage{hyperref}
 \usepackage{natbib}
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\DeclareUnicodeCharacter{00A0}{\space} % NBSP
+\DeclareUnicodeCharacter{202F}{\space} % NARROW NO-BREAK SPACE
+\DeclareUnicodeCharacter{2009}{\space} % THIN SPACE
+\DeclareUnicodeCharacter{200A}{\space} % HAIR SPACE
+\DeclareUnicodeCharacter{205F}{\space} % MEDIUM MATH SPACE
+\DeclareUnicodeCharacter{2007}{\space} % FIGURE SPACE
+\DeclareUnicodeCharacter{FEFF}{\space} % ZERO WIDTH NBSP (BOM)
+\DeclareUnicodeCharacter{200B}{}       % ZERO WIDTH SPACE -> remove
+\DeclareUnicodeCharacter{2060}{}       % WORD JOINER -> remove
 
 \lstset{basicstyle=\ttfamily\footnotesize,
         keywordstyle=\color{blue},
@@ -23,17 +32,8 @@
 \begin{document}
 
 \title{\textsc{Binary‑Star Evolution Modules in
-         \textnormal{REBOUNDx}}:\\
-       Roche‑Lobe Transfer, Magnetic Braking, Stellar Winds, Thermally Driven Winds, Eddington Winds,
-       Simplified Stellar Evolution, and Relativity}
-\author{Operator files: \texttt{roche\_lobe\_mass\_transfer.c},
-        \texttt{magnetic\_braking.c},
-        \texttt{stellar\_wind\_mass\_loss.c},
-        \texttt{thermally\_driven\_winds.c},
-        \texttt{eddington\_winds.c},
-        \texttt{stellar\_evolution\_sse.c},
-        \texttt{post\_newtonian.c}\\
-        Revision B – 10 July 2025}
+         \textnormal{REBOUNDx}}}
+\author{Mohamad Ali-Dib}
 \date{}
 \maketitle
 \vspace*{-1.5em}
@@ -54,261 +54,77 @@ citable reference.
 \end{abstract}
 
 %-------------------------------------------------------------------------------
-\section{Background and Motivation}
-\label{sec:intro}
-Roche‑lobe overflow, common‑envelope evolution, stellar winds,
-thermally driven winds, magnetic braking, simplified stellar evolution, and relativistic effects
-govern the orbital fates of close binaries\citep{Eggleton1983,Ostriker1999,
-Peters1964,Reimers1975,Verbunt1981,Kawaler1988,Hurley2000}.  Hydrodynamic
-simulations capture these effects but are computationally prohibitive for
-population synthesis, while purely secular codes lack the fidelity needed
-for higher‑order dynamical systems (e.g.\ triples or cluster environments).
-The modules documented here bridge these regimes by injecting carefully
-book‑kept mass changes and dissipative forces into an otherwise
-high‑precision $N$‑body integration.
 
-The Roche‑lobe mass transfer operator:
 
-\begin{itemize}[nosep,leftmargin=1.8em]
-\item tracks \emph{all} linear momentum channels to machine precision;
-\item offers four specific‑angular‑momentum prescriptions for systemic winds;
-\item prevents numerical divergence near coalescence through tight merge guards;
-\item adapts internal sub‑steps based on mass‑loss and dynamical
-      time‑scale criteria; and
-\item exposes an optional donor mass‑radius power law for adiabatic
-      responses to mass loss.
-\end{itemize}
+\section{Introduction}\label{sec:intro}
+Close binary stars evolve under a tightly coupled set of physical processes that redistribute mass and angular momentum and, in some regimes, remove orbital energy. Mass exchange through Roche–lobe overflow (RLOF) is triggered once a donor fills its volume–equivalent Roche surface, typically parameterized by the Eggleton formula \citep{Eggleton1983}, while the instantaneous mass–loss response near the inner Lagrange point can be captured by exponential prescriptions calibrated to the photospheric scale height \citep{Ritter1988}. In more extreme phases, unstable mass transfer and orbital shrinkage may lead to common–envelope (CE) evolution, during which hydrodynamic drag within an extended envelope extracts orbital energy and angular momentum \citep{Ostriker1999}. Independent channels of mass and angular–momentum loss operate throughout a binary’s life: cool convective stars experience magnetic braking via magnetized winds \citep{Verbunt1981,Kawaler1988}, giant–branch stars lose mass through stellar winds that correlate with global parameters \citep{Reimers1975}, and compact binaries emit gravitational radiation that drives secular inspiral on relativistic timescales \citep{Peters1964}. Changes in stellar structure modulate these pathways by altering radii, luminosities, and internal moments of inertia \citep{Hurley2000}. Taken together, these effects govern whether a close binary undergoes stable mass exchange, shrinks into contact and merges, or survives to produce compact remnants.
+
+Capturing this multi-physics landscape with a single method remains challenging. Fully three dimensional hydrodynamic calculations can resolve RLOF streams and CE flows, but they are too expensive for long-term evolution or population-scale parameter studies. Conversely, rapid binary–evolution formalisms encode RLOF, winds, magnetic braking, and gravitational–wave losses through secular prescriptions that are efficient and predictive in isolation, yet they generally assume a two-body context and cannot natively account for higher–order gravitational dynamics (e.g., triples, resonant encounters, or cluster potentials) that can modulate or even trigger mass transfer. A complementary approach is to embed vetted secular and dissipative processes within a high-accuracy $N$-body integrator so that orbital dynamics, spin evolution, and mass exchange proceed self-consistently on a common timestep while preserving the bookkeeping demanded by conservation laws.
+
+This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF operator that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific–angular–momentum prescriptions for escaping gas, with optional donor mass–radius responses following power–law scalings \citep{Eggleton1983,Ritter1988,Hurley2000}; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections that add spin–orbit couplings at 1.5\,PN, conservative 2\,PN point–mass and spin–spin terms, and 2.5\,PN gravitational–wave radiation reaction \citep{Einstein1915,Peters1964,Kidder1995}. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
+
+Algorithmically, the RLOF/CE module tracks all linear–momentum channels associated with accretion and systemic mass loss and applies a minimal corrective kick to maintain angular–momentum consistency, while adaptive sub-stepping limits the fractional changes in mass and separation per internal step to ensure numerical stability near contact. CE drag is modeled with a Mach-number–dependent dynamical-friction prescription capped by a CFL-like limiter to avoid excessive velocity impulses \citep{Ostriker1999}. The wind and magnetic-braking operators act directly on particle masses and spin vectors, respectively, with safeguards against overshoot in the spin update. The PN module follows the harmonic-gauge two-body equations of motion \citep{Kidder1995} and is split into configurable orders, enabling controlled experiments that isolate conservative precession from dissipative inspiral.
+
+Our goal is to make these processes available, documented, and reproducible within a single $N$-body environment so that studies of close-binary evolution can move seamlessly between isolated binaries and dynamically rich contexts. The remainder of this paper details the physical models and parameterizations (Section~\ref{sec:PhysicalModel}), the numerical implementation and safeguards (Section~\ref{sec:AlgorithmicFlow}), and example applications and recommended usage domains (Section~\ref{sec:future}). By anchoring each operator to established literature \citep{Eggleton1983,Ritter1988,Reimers1975,Verbunt1981,Kawaler1988,Peters1964,Kidder1995,Hurley2000,Ostriker1999}, we aim to provide a citable reference implementation suitable for precision studies of close binaries.
+
+
 
 %-------------------------------------------------------------------------------
-\section{Physical Model and Mathematical Formulation}
+\section{Effects implementation}
 
-\subsection{Roche‑Lobe Overflow (RLOF)}
-\label{sec:RLOF}
 
-\paragraph{Roche‑lobe radius.}
-The Eggleton formula~\cite{Eggleton1983} for the donor’s
-volume‑equivalent Roche radius,
-\begin{equation}
-R_{\mathrm L}
- = a\,
-   \frac{0.49\,q^{2/3}}{0.60\,q^{2/3}+\ln(1+q^{1/3})},
-\qquad
-q\equiv\frac{M_{\mathrm d}}{M_{\mathrm a}},
-\label{eq:Eggleton}
-\end{equation}
-is evaluated at run time to compute the overflow degree.
+\subsection{Simplified Stellar Evolution}
+\label{sec:sse}
+Some of the effects implemented below depends on having self-consistent evolution of the stellar radius and luminosity as a function of mass.
 
-\paragraph{Mass‑loss law.}
-The donor’s instantaneous mass‑loss rate follows
-\citet{Ritter1988}:
-\begin{equation}
-\dot M_{\mathrm d}
- = -\dot M_0
-   \exp\!\bigl[(R_{*}-R_{\mathrm L})/H_P\bigr],
-\label{eq:Ritter}
-\end{equation}
-with the exponent clamped to $\le80$ to avoid floating‑point overflow
-(\texttt{RLMT\_EXP\_CLAMP}). The donor must supply the pressure scale height
-$H_P$ and reference rate $\dot M_0$ through the particle parameters
-\texttt{rlmt\_Hp} and \texttt{rlmt\_mdot0}.
-
-\paragraph{Envelope veto.} If \texttt{rlmt\_skip\_in\_CE}=1\ (the default), the RLOF calculation is bypassed whenever the accretor resides inside the donor’s radius ($r<R_*$), allowing common‑envelope drag to dominate.
-
-\paragraph{Non‑conservative transfer.}
-A user‑set fraction $f_{\mathrm loss}\in[0,1]$ escapes as a wind,
-\begin{equation}
-\dot M_{\mathrm a}=-(1-f_{\mathrm loss})\,\dot M_{\mathrm d},\qquad
-\dot M_{\mathrm wind}=f_{\mathrm loss}\,|\dot M_{\mathrm d}|.
-\label{eq:noncon}
-\end{equation}
-
-\paragraph{Specific linear momentum of the wind.}
-Four prescriptions can be selected at run time:
-\begin{subequations}\label{eq:joptions}
-\begin{align}
-\mathbf v_{\mathrm{loss}} &= \mathbf v_{\mathrm d} && (\text{mode }0)\\
-                            &= \mathbf v_{\mathrm a} && (\text{mode }1)\\
-                            &= \frac{M_{\mathrm d}\,\mathbf v_{\mathrm d}+M_{\mathrm a}\,\mathbf v_{\mathrm a}}
-                               {M_{\mathrm d}+M_{\mathrm a}} && (\text{mode }2)\\
-                            &= \mathbf v_{\mathrm d} + f_j\,\mathbf e_\perp
-                               \frac{j_{\rm orb}}{r} && (\text{mode }3),
-\end{align}
-\end{subequations}
-where $\mathbf e_\perp$ is any unit vector orthogonal to the separation
-vector, $j_{\rm orb}=|\mathbf r\times\mathbf v|\,\mu^{-1}$ with reduced mass
-$\mu=M_{\mathrm d}M_{\mathrm a}/(M_{\mathrm d}+M_{\mathrm a})$, and
-$r=|\mathbf r|$ is the instantaneous separation.
-
-\paragraph{Momentum bookkeeping and angular‑momentum correction.}
-Accreted material arrives with the donor’s velocity, while wind
-particles remove the momentum $m_{\mathrm wind}\mathbf v_{\mathrm loss}$.
-After each RLOF step a minimal
-velocity shift
-\(
-\delta\mathbf v=(\Delta\mathbf L\times\mathbf r_{\mathrm a})/(M_{\mathrm a}r_{\mathrm a}^2)
-\)
-is applied to the accretor to compensate for the angular momentum carried by
-the transferred gas and keep the system’s total angular momentum unchanged.
-The donor receives the opposite kick scaled by $M_{\mathrm a}/M_{\mathrm d}$ so
-that linear momentum remains conserved. For diagnostics the accumulated
-energy change $\Delta E$ from mass transfer and the angular‑momentum
-correction is written to the operator attribute \texttt{rlmt\_last\_dE}.
-
-\paragraph{Donor radius evolution (optional).}
-If the donor supplies a non-zero \texttt{rlmt\_R\_slope}, its radius is updated
-after each sub-step according to the power law
+To supply mass-dependent stellar properties the optional
+\texttt{stellar\_evolution\_sse} operator updates each star's radius and
+luminosity using flexible power-law scalings inspired by \citet{Hurley2000}. For a
+particle of mass $M$ (in $M_\odot$) we set
 \[
-R_{\mathrm d}(M)=R_{\mathrm ref}
-\left(\frac{M}{M_{\mathrm ref}}\right)^{\alpha_R},
+R = R_{\rm coeff} R_\odot \left(\frac{M}{M_\odot}\right)^{R_{\rm exp}},\qquad
+L = L_{\rm coeff} L_\odot \left(\frac{M}{M_\odot}\right)^{L_{\rm exp}}.
 \]
-where $\alpha_R$ is \texttt{rlmt\_R\_slope}. The reference values
-\texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to the
-donor's initial mass and radius if not provided. This enables adiabatic or
-thermally driven mass–radius responses.
 
-%-------------------------------------------------------------------------------
-\subsection{Common–Envelope (CE) Dynamical Friction}
-\label{sec:ce_drag}
-
-\paragraph{Drag acceleration.}
-When the accretor resides inside the donor ($r<R_*)$ and a density profile is
-available, a companion of mass $M_{\mathrm a}$ moving through envelope gas
-experiences
-\[
-\mathbf a_{\rm DF}=
--\frac{4\pi\,G^2\,M_{\mathrm a}\,\rho}{v_{\rm rel}^3}\,
-   I(\mathcal M)\,\mathbf v_{\rm rel},
-\qquad
-\mathcal M\equiv\frac{v_{\rm rel}}{c_s},
-\]
-where the dimensionless factor is
-\begin{equation}
-I(\mathcal M)=
-\begin{cases}
-\dfrac{1}{3}\mathcal M^3+\dfrac{1}{5}\mathcal M^5,&\mathcal M<0.02,\\[0.6em]
-\dfrac{1}{2}\ln\!\dfrac{1+\mathcal M}{1-\mathcal M}-\mathcal M,
- & 0.02\le\mathcal M<1,\\[0.6em]
-\ln\!\bigl(1/x_{\min}\bigr),&\mathcal M\ge1.
-\end{cases}
-\label{eq:I_prefactor}
-\end{equation}
-For $\mathcal M<1$ the implementation additionally caps the result at
-$\ln(1/x_{\min})$,
-ensuring $I(\mathcal M)\le\ln(1/x_{\min})$ in \emph{all} regimes. The
-cutoff $x_{\min}$ is set by the operator parameter \texttt{ce\_xmin}
-(default $10^{-4}$).
-
-\paragraph{Hydrodynamic accretion term (optional).}
-If \texttt{ce\_Qd}$>$0 and the accretor's radius $R_{\mathrm acc}$ (taken from its
-\texttt{r} field) is positive, a Bondi–Hoyle–like contribution
-\[
-\mathbf a_{\rm GM}
-=-\frac{\pi\,\rho\,R_{\mathrm acc}^2\,v_{\rm rel}\,Q_d}{M_{\mathrm a}}
-\,\mathbf v_{\rm rel}
-\]
-is added.
-
-\paragraph{Envelope structure.}
-Density $\rho$ and sound speed $c_s$ are taken from either
-(i) a power‑law $\rho=\rho_0s^{\alpha_\rho}$, $c_s=c_{s0}s^{\alpha_{c_s}}$
-specified by the operator parameters \texttt{ce\_rho0}, \texttt{ce\_alpha\_rho},
-\texttt{ce\_cs}, and \texttt{ce\_alpha\_cs}; or
-(ii) a user‑supplied tabulated profile $(s,\rho,c_s)$ loaded once via
-\texttt{ce\_profile\_file}.  The table overrides the power‑law and is sampled
-with log–log linear interpolation.  If neither option is provided the CE drag
-step is skipped.
-
-\paragraph{CFL‑like limiter.}
-The velocity kick magnitude is limited to
-$|\Delta\mathbf v|\le\texttt{ce\_kick\_cfl}\times c_s$ to preserve accuracy
-in highly supersonic or stratified flows.
-
-\paragraph{Numerical stability.}
-Before evaluating the drag, the relative speed is floored to
-$v_{\rm rel,eff}=\max(v_{\rm rel},10^{-3}c_s)$ so the prefactor in
-Eq.~\eqref{eq:I_prefactor} remains finite even for very small Mach numbers.
-The sub‑step criteria $\Delta r/r\le\texttt{rlmt\_substep\_max\_dr}$ and
-$\Delta M/M\le\texttt{rlmt\_substep\_max\_dm}$ provide additional control over
-numerical stability.
-
-%-------------------------------------------------------------------------------
-\subsection{Magnetic Braking}
-\label{sec:mb}
-
-Low‑mass stars with convective envelopes lose spin angular momentum through
-magnetised winds.  The implementation follows the Verbunt–Zwaan and Kawaler
-torque law \citep{Verbunt1981,Kawaler1988}, applying a braking torque
-antiparallel to the star's spin vector.
-
-\paragraph{Torque law.} For a star of mass $M$, radius $R$, and angular
-velocity $\omega = |\bm\Omega|$, the spin‑down torque is
-\begin{equation}
-\tau = -K R^{1/2} M^{-1/2} \omega^3,
-\label{eq:mb_torque}
-\end{equation}
-where $K$ is a user‑set normalisation (parameter \texttt{mb\_K}, default
-$2.7\times10^{47}$ in cgs).  The torque modifies the spin by
-$\dot{\bm\Omega}=\tau\,\bm\Omega/(I\,\omega)$ with $I$ the particle's moment
-of inertia.
-
-\paragraph{Units and scaling.} The parameter \texttt{mb\_K} is specified in cgs
-units but is internally converted to the simulation's unit system using the
-operator parameters \texttt{mb\_Msun}, \texttt{mb\_Rsun}, and \texttt{mb\_year},
-which define the solar mass, solar radius, and Julian year in code units.
-Users therefore need not rescale $K$ manually.
-
-\paragraph{Saturation.} If a particle specifies a saturation threshold
-the critical angular velocity $\omega_{\rm sat}$ is determined as follows.
-If the particle supplies a convective turnover time \texttt{mb\_tau\_conv}, the
-code sets $\omega_{\rm sat}=2\pi/(\texttt{mb\_Rossby\_sat}\times\texttt{mb\_tau\_conv})$,
-where the operator parameter \texttt{mb\_Rossby\_sat} (default 0.1) is the
-critical Rossby number.  A user-specified \texttt{mb\_omega\_sat} overrides this
-value.  When $\omega>\omega_{\rm sat}$, the cubic dependence in
-Eq.~\eqref{eq:mb_torque} is replaced with $\omega\,\omega_{\rm sat}^2$, so the
-torque scales linearly with $\omega$ above the threshold.
-
-\paragraph{Activation.} Magnetic braking is applied only when a particle sets
-\texttt{mb\_on}=1 and has \texttt{mb\_convective}=1. Missing parameters,
-non‑positive $I$, vanishing spin vectors, or non‑finite $M$ or $R$ all
-bypass the update.  The spin is rescaled by $1+[(\tau/I\omega)\,\Delta t]$;
-if this factor would be non‑positive—and thus flip the spin—the step is
-skipped.
+The mass ratio $M/M_\odot$ uses the operator-level parameter
+\texttt{sse\_Msun} (default 1) to convert code masses into solar masses;
+\texttt{sse\_Rsun} and \texttt{sse\_Lsun} analogously define the solar radius
+and luminosity in code units.  Each particle may override the scaling using the
+particle-level parameters \texttt{sse\_R\_coeff}, \texttt{sse\_R\_exp},
+\texttt{sse\_L\_coeff}, and \texttt{sse\_L\_exp}; if unspecified, the default
+values in Table~\ref{tab:sse} are applied.  The particle's radius \texttt{sim.particles[index].r} field is set by $R$, and the luminosity $L$ is written to the attribute
+\texttt{sse\_L}. This stored luminosity can be used by other modules such as
+the thermally driven wind operator. Virtual particles are skipped, and stellar
+masses remain unchanged.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Magnetic braking parameters}
-\label{tab:mb}
+\caption{Simplified stellar-evolution parameters}
+\label{tab:sse}
 \begin{tabular}{@{}llll@{}}
 \toprule
 Name (scope) & Unit & Default & Purpose \\
 \midrule
-\texttt{mb\_K} (op) & cgs & $2.7\times10^{47}$ & Braking constant $K$\\
-\texttt{mb\_Msun} (op) & mass & 1 & Solar mass in code units\\
-\texttt{mb\_Rsun} (op) & length & 1 & Solar radius in code units\\
-\texttt{mb\_year} (op) & time & 1 & Julian year in code units\\
-\texttt{mb\_Rossby\_sat} (op) & — & 0.1 & Critical Rossby number\\
-\texttt{mb\_on} (part) & bool & 0 & Enable magnetic braking\\
-\texttt{mb\_convective} (part) & bool & 0 & Convective‑envelope flag\\
-\texttt{mb\_omega\_sat} (part) & 1/t & $\infty$ & Saturation angular velocity\\
-\texttt{mb\_tau\_conv} (part) & time & — & Convective turnover time\\
-\texttt{I} (part) & mass\,length$^2$ & — & Moment of inertia\\
-\texttt{Omega} (part, vec) & 1/t & — & Spin angular-velocity vector (\texttt{reb\_vec3d})\\
+\texttt{sse\_Msun}   (op) & mass      & 1   & Solar mass in code units\\
+\texttt{sse\_Rsun}   (op) & length     & 1   & Solar radius in code units\\
+\texttt{sse\_Lsun}   (op) & luminosity & 1   & Solar luminosity in code units\\
+\texttt{sse\_R\_coeff} (part) & —       & 1   & Radius scaling prefactor\\
+\texttt{sse\_R\_exp}   (part) & —       & 0.8 & Radius mass exponent\\
+\texttt{sse\_L\_coeff} (part) & —       & 1   & Luminosity scaling prefactor\\
+\texttt{sse\_L\_exp}   (part) & —       & 3.5 & Luminosity mass exponent\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Stellar Wind Mass Loss}
+\subsection{Reimers Stellar Wind Mass Loss}
 \label{sec:swml}
-
-Isotropic winds remove mass from single stars according to the
-Reimers prescription. For a star of mass $M$, luminosity $L$, and radius
+In the Reimers prescription \citep{Reimers1975}, isotropic winds remove mass from single cool, low- to intermediate-mass giants. For a star of mass $M$, luminosity $L$, and radius
 $R$, the mass-loss rate is
 \[
 \dot M = -4\times10^{-13}\,\eta\,\frac{L}{L_\odot}\frac{R}{R_\odot}\frac{M_\odot}{M}
 \;M_\odot\,\mathrm{yr}^{-1},
 \]
-where the dimensionless efficiency $\eta$ and luminosity $L$ are
-specified per particle, while $R$ is taken from the particle's radius field.
+where the dimensionless efficiency $\eta$ and luminosity $L$ (\texttt{sse$\_$L} defined above) are specified per particle, while $R$ is taken from the particle's radius field.
 Mass is removed isotropically with no linear-momentum
 recoil; virtual particles are ignored and after mass loss the system is
 recentred on the centre of mass.  A safety limiter caps the fractional
@@ -325,7 +141,6 @@ operator parameters (Table~\ref{tab:swml}).
 Name (scope) & Unit & Default & Purpose \\
 \midrule
 \texttt{swml\_eta} (part) & — & — & Wind efficiency $\eta$\\
-\texttt{swml\_L}   (part) & luminosity & — & Stellar luminosity $L$\\[0.2em]
 \texttt{swml\_const} (op) & $M_\odot$/yr & $4\times10^{-13}$ & Reimers prefactor\\
 \texttt{swml\_Msun}  (op) & mass & 1 & Solar mass in code units\\
 \texttt{swml\_Rsun}  (op) & length & 1 & Solar radius in code units\\
@@ -336,10 +151,10 @@ Name (scope) & Unit & Default & Purpose \\
 \end{tabular}
 \end{table}
 
-\subsection{Thermally Driven Winds}
+\subsection{Parker-type thermal wind}
 \label{sec:tdw}
 
-Thermal pressure can launch isotropic winds that carry away mass. For a star
+In cool, low-gravity stars, thermal pressure can launch isotropic winds that carry away mass \citep{parker}. For a star
 of mass $M$, luminosity $L$, and radius $R$, we adopt a Parker-like scaling
 \[
 \dot M = -C_{\rm th}\,\eta\,\left(\frac{R}{R_\odot}\right)^{\alpha_R}
@@ -383,295 +198,401 @@ Name (scope) & Unit & Default & Purpose \\
 \end{tabular}
 \end{table}
 
-\subsection{Eddington Winds}
+\subsection{Eddington-Limited Winds}
 \label{sec:edw}
 
-Luminosities that exceed the electron-scattering Eddington limit can drive
-isotropic mass loss. For a star of mass $M$ and luminosity $L$, the rate is
+Luminosities exceeding the electron-scattering Eddington limit in some massive and highly luminous stellar objects drive isotropic
+mass loss according to
 \[
-\dot M = -C_{\rm edd}\,\max\!\left(0, \frac{L}{L_{\rm Edd}} - 1\right)
+\dot M = -C_{\rm edd}\,\max\!\left(0,\frac{L}{L_{\rm Edd}}-1\right)
 \;M_\odot\,\mathrm{yr}^{-1},
 \]
-where $L_{\rm Edd} = L_{\rm Edd,0}(M/M_\odot)L_\odot$ with the coefficient
-$L_{\rm Edd,0}$ set by the operator parameter \texttt{edw\_Ledd\_coeff}. The
-luminosity $L$ must be provided via the particle attribute \texttt{sse\_L},
-for example by the simplified stellar-evolution operator. Mass is removed
-isotropically with no linear-momentum recoil; virtual particles are ignored
-and the system is recentred on the centre of mass. The normalisation,
-unit conversions, Eddington coefficient, year length, and safety cap on
-the fractional mass change are adjustable via operator parameters
-summarised in Table~\ref{tab:edw}. The operator is unit-agnostic if the
-scaling constants are supplied consistently.
+where $L_{\rm Edd} = L_{\rm Edd,coeff}\,(M/M_\odot)L_\odot$. The luminosity $L$
+is read from the particle attribute \texttt{sse\_L}, which must be supplied
+by the user or the simplified stellar-evolution operator. Mass is removed
+isotropically with no linear-momentum recoil; virtual particles are ignored,
+and after mass loss the system is recentred on the centre of mass. A limiter
+caps the fractional mass change at \texttt{edw\_max\_dlnM} per call. Operator
+parameters controlling the scaling constants are listed in
+Table~\ref{tab:edw}.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Eddington wind parameters}
+\caption{Super-Eddington wind parameters}
 \label{tab:edw}
 \begin{tabular}{@{}llll@{}}
 \toprule
 Name (scope) & Unit & Default & Purpose \\
 \midrule
-\texttt{sse\_L} (part) & luminosity & — & Stellar luminosity $L$\\[0.2em]
-\texttt{edw\_const} (op) & $M_\odot$/yr & $10^{-6}$ & Mass-loss prefactor $C_{\rm edd}$\\
-\texttt{edw\_Msun} (op) & mass & 1 & Solar mass in code units\\
-\texttt{edw\_Lsun} (op) & luminosity & 1 & Solar luminosity in code units\\
-\texttt{edw\_year} (op) & time & 1 & Length of Julian year in code units\\
-\texttt{edw\_Ledd\_coeff} (op) & $L_\odot/M_\odot$ & $3.2\times10^{4}$ & Eddington coefficient\\
+\texttt{sse\_L} (part) & luminosity & — & Stellar luminosity $L$\\
+\texttt{edw\_const} (op) & $M_\odot$/yr & $1\times10^{-6}$ & Mass-loss prefactor $C_{\rm edd}$\\
+\texttt{edw\_Msun}  (op) & mass & 1 & Solar mass in code units\\
+\texttt{edw\_Lsun}  (op) & luminosity & 1 & Solar luminosity in code units\\
+\texttt{edw\_year}  (op) & time & 1 & Length of Julian year in code units\\
+\texttt{edw\_Ledd\_coeff} (op) & $L_\odot/M_\odot$ & $3.2\times10^{4}$ & $L_{\rm Edd}$ per unit mass\\
 \texttt{edw\_max\_dlnM} (op) & — & 0.1 & Max $|\Delta M|/M$ per call\\
 \bottomrule
 \end{tabular}
 \end{table}
+\subsection{Magnetic Braking}
+\label{sec:mb}
 
-\subsection{Simplified Stellar Evolution}
-\label{sec:sse}
+Low‑mass stars with convective envelopes lose spin angular momentum through
+magnetised winds. In tidally coupled binaries (particularly when a component is close to synchronous rotation), tidal torques replenish the braked spin by drawing from the orbital reservoir, leading to a net loss of orbital angular momentum and a secular decrease of the semi‑major axis and orbital period, whereas in wide or weakly coupled systems the orbital response is negligible on comparable timescales.
 
-To supply mass-dependent stellar properties the optional
-\texttt{stellar\_evolution\_sse} operator updates each star's radius and
-luminosity using power-law scalings inspired by \citet{Hurley2000}. For a
-particle of mass $M$ (in $M_\odot$) we set
-\[
-R = R_{\rm coeff} R_\odot \left(\frac{M}{M_\odot}\right)^{R_{\rm exp}},\qquad
-L = L_{\rm coeff} L_\odot \left(\frac{M}{M_\odot}\right)^{L_{\rm exp}}.
-\]
-The mass ratio $M/M_\odot$ uses the operator parameter
-\texttt{sse\_Msun} (default 1) to convert code masses into solar masses;
-\texttt{sse\_Rsun} and \texttt{sse\_Lsun} analogously define the solar radius
-and luminosity in code units.  Each particle may override the scaling using the
-particle-level parameters \texttt{sse\_R\_coeff}, \texttt{sse\_R\_exp},
-\texttt{sse\_L\_coeff}, and \texttt{sse\_L\_exp}; if unspecified, the default
-values in Table~\ref{tab:sse} are applied.  The particle's radius field is
-replaced by $R$, and the luminosity $L$ is written to the attribute
-\texttt{sse\_L}. This stored luminosity can be used by other modules such as
-the thermally driven wind operator. Virtual particles are skipped, and stellar
-masses remain unchanged.
+We implement the Verbunt--Zwaan / Kawaler torque law
+\citep{Verbunt1981,Kawaler1988}, applying a braking torque antiparallel to the
+spin vector.
+
+\paragraph{Torque law.}
+For a star of mass $M$, radius $R$, and angular velocity
+$\omega = \lVert\boldsymbol{\Omega}\rVert$, the spin‑down torque is
+\begin{equation}
+\label{eq:mb_torque}
+\frac{dJ}{dt}
+= -K\,\Big(\frac{R}{R_\odot}\Big)^{1/2}\Big(\frac{M}{M_\odot}\Big)^{-1/2}
+\begin{cases}
+\omega^3, & \omega \le \omega_{\rm sat},\\[3pt]
+\omega\,\omega_{\rm sat}^{2}, & \omega > \omega_{\rm sat},
+\end{cases}
+\end{equation}
+where $K$ is a normalisation constant (operator parameter \texttt{mb\_K},
+default $2.7\times10^{47}$ in cgs). The torque acts colinearly with
+$\boldsymbol{\Omega}$, so the spin direction is unchanged by this operator.
+
+\paragraph{Units and scaling.}
+Users specify \texttt{mb\_K} in cgs. Internally we convert to code units using
+the operator parameters \texttt{mb\_Msun}, \texttt{mb\_Rsun}, and
+\texttt{mb\_year}, which define $M_\odot$, $R_\odot$, and the Julian year in
+\emph{code} units. Defining the cgs-per-code base units
+$M_{\rm unit}=\mathrm{g}/\mathrm{(code\;mass)}$,
+$L_{\rm unit}=\mathrm{cm}/\mathrm{(code\;length)}$,
+$T_{\rm unit}=\mathrm{s}/\mathrm{(code\;time)}$, and noting that
+$[K]=M\,L^{2}\,T$, we obtain
+\begin{equation}
+K_{\rm code}=\frac{K_{\rm cgs}}{M_{\rm unit}\,L_{\rm unit}^{2}\,T_{\rm unit}},
+\end{equation}
+and then evaluate Eq.~\eqref{eq:mb_torque} with the explicit
+dimensionless factors $(R/R_\odot)^{1/2}(M/M_\odot)^{-1/2}$.
+Users do not need to manually rescale \texttt{mb\_K}.
+
+\paragraph{Saturation.}
+If a particle provides a convective turnover time \texttt{mb\_tau\_conv},
+the code sets the critical angular velocity via the Rossby number as
+\begin{equation}
+\omega_{\rm sat} = \frac{2\pi}{\texttt{mb\_Rossby\_sat}\times \texttt{mb\_tau\_conv}},
+\end{equation}
+with \texttt{mb\_Rossby\_sat} (operator level; default 0.1).
+A particle-supplied \texttt{mb\_omega\_sat} overrides this value.
+For $\omega>\omega_{\rm sat}$ the torque scales linearly with $\omega$,
+ensuring a continuous transition at the threshold.
+
+\paragraph{Time integration (closed form).}
+Because the torque is colinear with $\boldsymbol{\Omega}$,
+the magnitude $\omega$ obeys a scalar ODE with a closed-form solution. Define
+\begin{equation}
+C \;=\; \frac{K_{\rm code}}{I}\,
+\Big(\frac{R}{R_\odot}\Big)^{1/2}\Big(\frac{M}{M_\odot}\Big)^{-1/2}.
+\end{equation}
+Then
+\begin{align}
+\text{unsaturated:}\quad
+&\frac{d\omega}{dt} = -C\,\omega^3
+\;\Rightarrow\;
+\omega(t+\Delta t) = \frac{\omega(t)}{\sqrt{1+2C\,\omega(t)^2\,\Delta t}},
+\\[4pt]
+\text{saturated:}\quad
+&\frac{d\omega}{dt} = -C\,\omega_{\rm sat}^2\,\omega
+\;\Rightarrow\;
+\omega(t+\Delta t) = \omega(t)\,\exp\!\big[-C\,\omega_{\rm sat}^2\,\Delta t\big].
+\end{align}
+If a step starts in the saturated regime and crosses to the unsaturated regime,
+the update is applied piecewise exactly: exponential decay to
+$\omega_{\rm sat}$ followed by the unsaturated formula for the remainder of the
+step. The spin vector is finally rescaled by
+$\boldsymbol{\Omega}\leftarrow \boldsymbol{\Omega}\times[\omega(t+\Delta t)/\omega(t)]$.
+This scheme is positivity‑preserving and avoids step‑size instabilities.
+
+\paragraph{Activation and guards.}
+Braking is applied only if a particle sets \texttt{mb\_on}$=1$ and
+\texttt{mb\_convective}$=1$. Missing parameters, non‑positive or non‑finite
+$I$, $M$, or $R$ bypass the update. A per‑particle radius override
+\texttt{mb\_R} (in code length units) is supported; otherwise the particle
+radius \texttt{p->r} is used. The operator does nothing for vanishing spin
+vectors.
 
 \begin{table}[h]
 \centering\footnotesize
-\caption{Simplified stellar-evolution parameters}
-\label{tab:sse}
+\caption{Magnetic braking parameters}
+\label{tab:mb}
 \begin{tabular}{@{}llll@{}}
 \toprule
 Name (scope) & Unit & Default & Purpose \\
 \midrule
-\texttt{sse\_Msun}   (op) & mass      & 1   & Solar mass in code units\\
-\texttt{sse\_Rsun}   (op) & length     & 1   & Solar radius in code units\\
-\texttt{sse\_Lsun}   (op) & luminosity & 1   & Solar luminosity in code units\\
-\texttt{sse\_R\_coeff} (part) & —       & 1   & Radius scaling prefactor\\
-\texttt{sse\_R\_exp}   (part) & —       & 0.8 & Radius mass exponent\\
-\texttt{sse\_L\_coeff} (part) & —       & 1   & Luminosity scaling prefactor\\
-\texttt{sse\_L\_exp}   (part) & —       & 3.5 & Luminosity mass exponent\\
+\texttt{mb\_K} (op) & cgs & $2.7\times10^{47}$ & Braking constant $K$\\
+\texttt{mb\_Msun} (op) & mass & 1 & Solar mass in code units\\
+\texttt{mb\_Rsun} (op) & length & 1 & Solar radius in code units\\
+\texttt{mb\_year} (op) & time & 1 & Julian year in code units\\
+\texttt{mb\_Rossby\_sat} (op) & — & 0.1 & Critical Rossby number\\
+\texttt{mb\_on} (part) & bool & 0 & Enable magnetic braking\\
+\texttt{mb\_convective} (part) & bool & 0 & Convective‑envelope flag\\
+\texttt{mb\_omega\_sat} (part) & 1/t & $\infty$ & Saturation angular velocity\\
+\texttt{mb\_tau\_conv} (part) & time & — & Convective turnover time\\
+\texttt{mb\_R} (part) & length & — & Radius override (else particle radius)\\
+\texttt{I} (part) & mass\,length$^2$ & — & Moment of inertia\\
+\texttt{Omega} (part, vec) & 1/t & — & Spin angular‑velocity vector (\texttt{reb\_vec3d})\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-%-------------------------------------------------------------------------------
-\section{Algorithmic Flow}
+\paragraph{Sanity checks.}
+With \texttt{mb\_Msun} = \texttt{mb\_Rsun} = \texttt{mb\_year} = 1, $M=R=1$,
+and $\omega$ in rad/year, the unsaturated torque scales as $\omega^3$ with the
+expected normalisation from the literature. The update is continuous at
+$\omega=\omega_{\rm sat}$ by construction.
 
-Each operator call subdivides the requested time span into at least
-\texttt{rlmt\_min\_substeps} internal steps.  The sub‑step size obeys the
-limits $|\Delta M|/M\le\texttt{rlmt\_substep\_max\_dm}$ and
-$|\Delta r|/r\le\texttt{rlmt\_substep\_max\_dr}$ to control mass transfer and
-orbital motion.  An initial guard merges the pair if their separation falls
-below $\varepsilon_{\rm merge}$, where
-$\varepsilon_{\rm merge}=\texttt{merge\_eps}$ or
-$0.5\min(R_{*},R_{\rm acc})$ when unspecified.
 
-\begin{enumerate}[nosep]
-\item \textbf{Pre‑check:} merge guard if $r\le\varepsilon_{\rm merge}$.
-\item \textbf{Sub‑step loop} (adaptive):
-  \begin{enumerate}[nosep]
-    \item RLOF mass exchange and momentum bookkeeping.
-    \item CE drag (if inside envelope).
-    \item Secondary merge guard.
-  \end{enumerate}
-\item Purge zero‑mass particles.  If either the donor or accretor vanishes,
-      the operator detaches automatically; finally the system is recentred on
-      its centre of mass.
-\end{enumerate}
+\subsection{Post-Newtonian (PN) corrections}
+\label{sec:pn}
 
-%-------------------------------------------------------------------------------
-\section{Run‑Time Parameters for Roche‑Lobe Transfer}
-\label{sec:param_table}
-
-\begin{table}[h]
-\centering\footnotesize
-\caption{Operator-level (\textit{op}) and particle-level (\textit{part}) parameters for the
-Roche-lobe mass transfer effect.}
-\label{tab:params}
-\begin{tabular}{@{}lllll@{}}
-\toprule
-Name (scope) & Unit & Default & Purpose \\
-\midrule
-\texttt{rlmt\_donor}      (op)   & —        & — & Donor particle index\\
-\texttt{rlmt\_accretor}   (op)   & —        & — & Accretor particle index\\
-\texttt{rlmt\_Hp}         (part) & length   & — & Pressure‐scale height $H_P$\\
-\texttt{rlmt\_mdot0}      (part) & M/t      & — & Reference rate $\dot M_0$\\[0.2em]
-%
-\texttt{rlmt\_loss\_fraction} (op) & —      & 0 & Wind mass fraction $f_{\mathrm loss}$\\
-\texttt{jloss\_mode}      (op)   & int      & 0 & Choice in eqs.~\eqref{eq:joptions}\\
-\texttt{jloss\_factor}    (op)   & —        & 1 & Scale factor $f_j$ (mode 3)\\
-\texttt{rlmt\_skip\_in\_CE}(op)  & bool     & 1 & Disable RLOF if inside envelope\\[0.2em]
-%
-\texttt{rlmt\_substep\_max\_dm} (op) & —    & $10^{-3}$ & Max $|\Delta M|/M$ per sub‑step\\
-\texttt{rlmt\_substep\_max\_dr} (op) & —    & $5\times10^{-3}$ & Max $|\Delta r|/r$ per sub‑step\\
-\texttt{rlmt\_min\_substeps}    (op) & int  & 3 & Minimum sub‑steps per call\\[0.2em]
-%
-\texttt{rlmt\_R\_slope}      (part) & —     & 0 & Donor mass‑radius exponent $\alpha_R$\\
-\texttt{rlmt\_R\_ref\_mass}  (part) & mass  & $M_{\rm init}$ & Reference mass $M_{\rm ref}$\\
-\texttt{rlmt\_R\_ref\_radius}(part) & length& $R_{\rm init}$ & Reference radius $R_{\rm ref}$\\[0.2em]
-%
-\texttt{ce\_rho0}       (op) & density & — & Envelope density normalisation\\
-\texttt{ce\_cs}         (op) & speed   & — & Sound-speed normalisation\\
-\texttt{ce\_alpha\_rho}(op) & —       & 0 & Density power-law slope\\
-\texttt{ce\_alpha\_cs} (op) & —       & 0 & Sound-speed power-law slope\\
-\texttt{ce\_profile\_file}  (op) & path & — & ASCII $(s,\rho,c_s)$ profile, overrides power law\\
-\texttt{ce\_kick\_cfl}      (op) & — & 1 & Velocity‑kick limiter\\
-\texttt{ce\_xmin}           (op) & — & $10^{-4}$ & Coulomb cutoff $x_{\min}$\\
-\texttt{ce\_Qd}             (op) & — & 0 & Geometric drag coefficient\\[0.2em]
-\texttt{merge\_eps}         (op) & length & $0.5\min(R_*,R_{\rm acc})$ & Merge radius\\
-\texttt{rlmt\_last\_dE}    (op, out) & energy & — & Energy change from last call\\
-\bottomrule
-\end{tabular}
-\end{table}
-
-%-------------------------------------------------------------------------------
-\section{Post‐Newtonian Relativistic Corrections}
-
-Compact binaries experience post‐Newtonian forces that couple the spins
-and radiate orbital energy.  The
-\texttt{post\_newtonian} effect implements the harmonic‐coordinate
-point‐mass equations of motion of \citet{Kidder1995} for each pair of
-massive bodies:
+Compact binaries experience relativistic corrections that couple the spins and
+radiate orbital energy. The \texttt{post\_newtonian} effect implements the
+harmonic-coordinate point-mass equations of motion from \citet{Kidder1995} for
+each massive pair:
 \begin{itemize}[nosep,leftmargin=1.8em]
-  \item $1.5$\,PN spin–orbit couplings;
-  \item $2$\,PN point‐mass and spin–spin conservative corrections;
-  \item $2.5$\,PN gravitational‐wave radiation reaction.
+  \item $2$\,PN conservative point-mass (PM) and spin--spin (SS) corrections;
+  \item $2.5$\,PN gravitational-wave radiation reaction (RR).
 \end{itemize}
+Note that we omitted  $1$\,PN and $1.5$\,PN corrections as they can be added via \texttt{Reboundx}' built-in gr$\_$full and lense$\_$thirring effects.
 
-\medskip
-\noindent
+
+\paragraph{Variables and masses.}
 For two bodies with masses $m_i$, $m_j$, separation vector $\mathbf{r}$,
 relative velocity $\mathbf{v}$, define
 \[
   m = m_i + m_j,\quad
-  \eta = \frac{m_i\,m_j}{m^2},\quad
+  \mu = \frac{m_i m_j}{m},\quad
+  \eta = \frac{\mu}{m},\quad
   \mathbf{n} = \frac{\mathbf{r}}{r},\quad
-  \dot r = \mathbf{v}\cdot\mathbf{n},\quad
-  \mu = \frac{m_i\,m_j}{m}.
+  \dot r = \mathbf{v}\cdot\mathbf{n}.
 \]
-Then the relative acceleration additions are:
-\medskip
-\noindent\textbf{$1.5$\,PN spin–orbit (Eq.​2.2c of \citealp{Kidder1995}):}
-\[
-  \mathbf{a}_{1.5\mathrm{PN}}
-  = \frac{G}{c^3\,r^3}
-    \Bigl[
-      6\,\mathbf{n}\bigl[(\mathbf{n}\times\mathbf{v})\!\cdot\!S_{\rm eff}\bigr]
-     -(\mathbf{v}\times S_{7})
-     +3\,\dot r\,(\mathbf{n}\times S_{3})
-    \Bigr],
-\]
-where
-\[
-  S = S_1 + S_2,\quad
-  \Delta = m\Bigl(\tfrac{S_2}{m_2}-\tfrac{S_1}{m_1}\Bigr),\quad
-  S_{\rm eff} = 2\,S + \frac{m_1-m_2}{m}\,\Delta,
-\]
-\[
-  S_{7} = 7\,S + 3\,\frac{m_1-m_2}{m}\,\Delta,\quad
-  S_{3} = 3\,S + \frac{m_1-m_2}{m}\,\Delta.
-\]
+Spins $S_1,S_2$ are \emph{physical} angular momenta (units mass\,length$^2$/time).
+If users prefer dimensionless spins $\chi_i$, convert via
+$S_i = \chi_i\,G m_i^2 / c$ in the simulation's unit system.
 
-\medskip
-\noindent\textbf{$2$\,PN conservative (Eqs.​2.2d–e of \citealp{Kidder1995}):}
-\begin{align}
+\paragraph{2\,PN conservative (Eqs.\,2.2d,e).}
+The point-mass part is written as
+\[
 \mathbf{a}_{2\mathrm{PN}}^{\rm pm}
-&= -\frac{G\,m}{c^4\,r^2}
-   \Bigl[A_{2}\,\mathbf{n} \;+\; B_{v,2}\,\mathbf{v}\Bigr],\\
-A_{2}
-&= \tfrac{3}{4}(12+29\eta)\,\frac{G^2m^2}{r^2}
- +\eta(3-4\eta)\,v^4
- +\tfrac{15}{8}\,\eta(1-3\eta)\,\dot r^4
- -\tfrac{3}{2}\,\eta(3-4\eta)\,v^2\dot r^2
- -(2+25\eta+2\eta^2)\,\frac{G\,m}{r}\,\dot r^2,\\
-B_{v,2}
-&= -\tfrac{1}{2}\,\dot r
-   \Bigl[\eta(15+4\eta)\,v^2
-         -(4+41\eta+8\eta^2)\,\tfrac{G\,m}{r}
-         -3\eta(3+2\eta)\,\dot r^2\Bigr],
-\end{align}
+= -\frac{G\,m}{c^4 r^2}
+   \Bigl[A_{2}\,\mathbf{n} + B_{v,2}\,\mathbf{v}\Bigr],
+\]
+with $A_2$ and $B_{v,2}$ built from $v^2$, $\dot r^2$, and $Gm/r$;
+the implementation includes the \(-\tfrac12\,\eta(13-4\eta)\,(Gm/r)\,v^2\) term
+so that $A_2$ matches \citet{Kidder1995}. The spin--spin coupling is
 \[
   \mathbf{a}_{2\mathrm{PN}}^{\rm ss}
-  = -\frac{3\,G}{c^4\,r^4}
+  = -\frac{3\,G}{\mu\,c^2\,r^4}
     \left[
-      \frac{S_1\!\cdot\!S_2-5(\mathbf{n}\!\cdot\!S_1)(\mathbf{n}\!\cdot\!S_2)}{m_1 m_2}\,\mathbf{n}
-     +\frac{\mathbf{n}\!\cdot\!S_2}{m_1^2}\,S_1
-     +\frac{\mathbf{n}\!\cdot\!S_1}{m_2^2}\,S_2
-    \right].
+      \bigl(S_1\!\cdot\!S_2 - 5(\mathbf{n}\!\cdot\!S_1)(\mathbf{n}\!\cdot\!S_2)\bigr)\mathbf{n}
+      + (\mathbf{n}\!\cdot\!S_2)\,S_1 + (\mathbf{n}\!\cdot\!S_1)\,S_2
+    \right],
 \]
+which uses physical spins and the reduced mass $\mu$ in the overall prefactor.
 Hence
 \[
-  \mathbf{a}_{2\mathrm{PN}}
-  = \mathbf{a}_{2\mathrm{PN}}^{\rm pm}
-  +\mathbf{a}_{2\mathrm{PN}}^{\rm ss}.
+  \mathbf{a}_{2\mathrm{PN}}=\mathbf{a}_{2\mathrm{PN}}^{\rm pm}+\mathbf{a}_{2\mathrm{PN}}^{\rm ss}.
 \]
 
-\medskip
-\noindent\textbf{$2.5$\,PN radiation reaction (Eq.​2.2f of \citealp{Kidder1995}):}
-\begin{align}
+\paragraph{2.5\,PN radiation reaction (Eq.\,2.2f).}
+\[
 \mathbf{a}_{2.5\mathrm{PN}}
-&= \frac{8\,G^2\,m^2\,\eta}{5\,c^5\,r^3}
-   \Bigl[
-     \dot r\Bigl(18\,v^2 + \tfrac{2}{3}\,\tfrac{G\,m}{r} - 25\,\dot r^2\Bigr)\mathbf{n}
-    -\Bigl(6\,v^2 - 2\,\tfrac{G\,m}{r} - 15\,\dot r^2\Bigr)\mathbf{v}
-   \Bigr].
-\end{align}
+= \frac{8\,G^2 m^2 \eta}{5\,c^5 r^3}
+\left[
+  \dot r\left(18v^2+\tfrac{2}{3}\tfrac{Gm}{r}-25\dot r^2\right)\mathbf{n}
+ -\left(6v^2-2\tfrac{Gm}{r}-15\dot r^2\right)\mathbf{v}
+\right].
+\]
 
-\medskip
-\noindent
-These accelerations are computed pairwise and then split between bodies
-in proportion to their masses, ensuring total linear momentum conservation.
+\paragraph{Units and parameters.}
+The effect parameter \texttt{c} is the speed of light in \emph{code units}.
+The toggles \texttt{pn\_2PN}, and \texttt{pn\_25PN}
+(default 1) enable the corresponding sectors. Particle parameter
+\texttt{pn\_spin} is a \texttt{reb\_vec3d} storing the physical spin vector.
 
-\bigskip
-\noindent\textbf{Effect parameters:}
+\paragraph{Momentum conservation and scope.}
+Accelerations are built for the relative coordinate and split between bodies
+in proportion to their masses, preserving total linear momentum.
+Spin precession equations are not included; if spins are misaligned, the
+orbital dynamics include SO and SS forces with fixed spins.
+
+\paragraph{Effect on binary orbits.}
+The 2.5\,PN term removes orbital energy and angular momentum, driving a secular
+decrease of the semi-major axis and (typically) eccentricity toward merger.
+When spins are present, the spin–spin terms cause relativistic
+precession and can modulate the instantaneous orbital plane and pericentre
+orientation, altering waveform phase evolution even when the mean orbital
+elements change slowly.
+
+
+
+\subsection{Roche–Lobe Overflow and Common–Envelope Operator}
+\label{sec:RLOF}
+
+This effect models mass transfer in compact binaries via Roche–lobe overflow
+(RLOF) together with optional common–envelope (CE) drag. The implementation
+targets robust long integrations: internal sub–stepping constrains
+$|\Delta M|/M$ and $|\Delta r|/r$, merge guards prevent divergences, and
+diagnostics expose the accumulated energy change from non–Hamiltonian updates.
+
+\paragraph{Roche geometry and mass–loss law.}
+The donor’s volume–equivalent Roche radius is evaluated with the Eggleton
+formula \citep{Eggleton1983},
+\begin{equation}
+R_{\rm L} = a\,\frac{0.49\,q^{2/3}}{0.60\,q^{2/3} + \ln(1+q^{1/3})},
+\qquad q \equiv \frac{M_{\rm d}}{M_{\rm a}},
+\end{equation}
+and the instantaneous mass–loss rate follows the Ritter prescription
+\citep{Ritter1988},
+\begin{equation}
+\dot M_{\rm d} = -\dot M_0\,
+\exp\!\left[\frac{R_\ast - R_{\rm L}}{H_P}\right],
+\end{equation}
+with the exponent clamped to $\le 80$ to avoid numerical overflow. The donor
+particle provides $H_P$ and $\dot M_0$ as \texttt{rlmt\_Hp} and
+\texttt{rlmt\_mdot0}.
+
+\paragraph{Conservative and systemic mass channels.}
+Over a sub–step of size $\Delta t$, the donor loses $m_{\rm loss}=-\dot M_{\rm d}\,\Delta t>0$,
+which is split into accreted and wind parts:
+\[
+m_{\rm acc} = (1-f_{\rm loss})\,m_{\rm loss},\qquad
+m_{\rm wind} = f_{\rm loss}\,m_{\rm loss},\quad f_{\rm loss}\in[0,1].
+\]
+The accretor’s mass increases by $m_{\rm acc}$; the wind mass $m_{\rm wind}$
+leaves the system.
+
+\paragraph{Linear momentum (exact).}
+Conservative accretion is treated internally: $m_{\rm acc}$ is added to the
+accretor with the donor’s instantaneous velocity, while the donor’s mass is
+reduced; this leaves the pair’s total momentum unchanged. Systemic wind
+removes linear momentum $m_{\rm wind}\,\mathbf v_{\rm loss}$; the code applies a
+uniform shift to both stars so that
+$\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$ exactly.
+
+\paragraph{$j$–loss (wind angular momentum).}
+The specific angular momentum carried by the wind is prescribed by a mode
+parameter:
+\begin{align*}
+\text{mode 0:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm d}\quad\Rightarrow\quad
+\Delta\mathbf L_{\rm wind} = m_{\rm wind}\,(\mathbf r_{\rm d}\!-\mathbf R_{\rm CM}) \times \mathbf v_{\rm d},\\
+\text{mode 1:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm a}\quad\Rightarrow\quad
+\Delta\mathbf L_{\rm wind} = m_{\rm wind}\,(\mathbf r_{\rm a}\!-\mathbf R_{\rm CM}) \times \mathbf v_{\rm a},\\
+\text{mode 2:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm CM}\quad\Rightarrow\quad
+\Delta\mathbf L_{\rm wind}=\mathbf 0\quad,\\
+\text{mode 3:}~&|\Delta\mathbf L_{\rm wind}|=m_{\rm wind}\,f_j\,j_{\rm orb},\qquad
+j_{\rm orb}\equiv\frac{J}{M}=\frac{\mu\,|\mathbf r\times\mathbf v|}{M_{\rm d}+M_{\rm a}},
+\qquad \mu=\frac{M_{\rm d}M_{\rm a}}{M_{\rm d}+M_{\rm a}}.
+\end{align*}
+with $\Delta\mathbf L_{\rm wind}$ aligned with the orbital angular momentum.
+After the linear momentum update, the code applies a \emph{pure torque}
+(zero net impulse) so that the pair’s orbital angular momentum is reduced by
+exactly $\Delta\mathbf L_{\rm wind}$.
+
+\paragraph{Conservative transfer angular momentum.}
+In the absence of external torques, conservative mass relocation should not
+change the system’s orbital angular momentum. The operator computes the
+angular–momentum difference between placing $m_{\rm acc}$ at the donor and at
+the accretor (both at the donor velocity) and applies a minimal pure‐torque
+velocity correction to enforce $\Delta L_{\rm acc}=0$.
+
+\paragraph{Donor radius evolution (optional).}
+If the donor supplies \texttt{rlmt\_R\_slope}$=\alpha_R\ne0$, its radius is
+updated after each sub–step via a power law
+\[
+R_{\rm d}(M) = R_{\rm ref}\left(\frac{M}{M_{\rm ref}}\right)^{\alpha_R},
+\]
+where \texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to
+the donor’s current values if not provided.
+
+\subsubsection{Common–Envelope (CE) Drag}
+When the accretor is inside the donor ($r<R_\ast$), the code can apply
+dynamical friction following Ostriker’s formula,
+\[
+\mathbf a_{\rm DF} = -\,\frac{4\pi G^2 M_{\rm a}\rho}{v_{\rm rel}^3}\,
+I(\mathcal M)\,\mathbf v_{\rm rel},\qquad\mathcal M=\frac{v_{\rm rel}}{c_s},
+\]
+with
+\[
+I(\mathcal M)=
+\begin{cases}
+\frac{1}{3}\mathcal M^3+\frac{1}{5}\mathcal M^5, & \mathcal M<0.02,\\[0.4em]
+\frac{1}{2}\ln\!\frac{1+\mathcal M}{1-\mathcal M}-\mathcal M, & 0.02\le\mathcal M<1,\\[0.4em]
+\ln(1/x_{\min})+\tfrac12\ln\!\bigl(1-\mathcal M^{-2}\bigr), \quad \mathcal M\ge1,
+\end{cases}
+\]
+capped by $\ln(1/x_{\min})$ for continuity. A geometric term
+$-\pi\rho R_{\rm a}^2 Q_d\,v_{\rm rel}\,\mathbf v_{\rm rel}/M_{\rm a}$ may be
+added. The envelope structure comes either from a user–supplied table
+$(s,\rho,c_s)$ (\texttt{ce\_profile\_file}) with log–log interpolation or from
+a power law $\rho=\rho_0 s^{\alpha_\rho}$, $c_s=c_{s0}s^{\alpha_{c_s}}$.
+The velocity kick per sub–step is limited by
+$|\Delta\mathbf v|\le\texttt{ce\_kick\_cfl}\,c_s$.
+By default the envelope is an \emph{external} sink: no opposite reaction is
+applied to the donor; this can be enabled with \texttt{ce\_reaction\_on\_donor}=1.
+
+\subsubsection{Numerics and flow}
+Each operator call subdivides the requested interval into at least
+\texttt{rlmt\_min\_substeps} sub–steps; the size adapts to satisfy
+$|\Delta M|/M\le\texttt{rlmt\_substep\_max\_dm}$ and
+$|\Delta r|/r\le\texttt{rlmt\_substep\_max\_dr}$. A merge guard triggers when
+$r\le\varepsilon_{\rm merge}$ (user parameter \texttt{merge\_eps} or the
+default $0.5\min(R_\ast,R_{\rm a})$ with a small positive floor). The operator
+purges zero–mass particles and detaches itself if either component vanishes.
+The accumulated energy change $\Delta E$ over the call is exported as
+\texttt{rlmt\_last\_dE} for diagnostics; because the scheme includes physical
+sinks (wind, drag) this value is not expected to vanish.
+
+\subsubsection{Parameters}
 \begin{table}[h]
 \centering\footnotesize
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}llll@{}}
 \toprule
-Field            & Unit             & Description                                \\
+Name (scope) & Unit & Default & Purpose \\
 \midrule
-\texttt{c}        & length/time      & Speed of light (required)                  \\
-\texttt{pn\_15PN} & —                & Include 1.5 PN spin–orbit terms (default: 1)\\
-\texttt{pn\_2PN}  & —                & Include 2 PN terms (default: 1)             \\
-\texttt{pn\_25PN} & —                & Include 2.5 PN terms (default: 1)           \\
+\texttt{rlmt\_donor} (op) & — & — & Donor index (double, cast to int) \\
+\texttt{rlmt\_accretor} (op) & — & — & Accretor index (double, cast to int) \\
+\texttt{rlmt\_Hp} (part) & length & — & Pressure scale height (donor) \\
+\texttt{rlmt\_mdot0} (part) & M/t & — & Reference overflow rate (donor) \\
+\texttt{rlmt\_loss\_fraction} (op) & — & 0 & Wind fraction $f_{\rm loss}$ \\
+\texttt{jloss\_mode} (op) & — & 0 & Wind $j$ prescription (0–3) \\
+\texttt{jloss\_factor} (op) & — & 1 & Scale $f_j$ for mode 3 \\
+\texttt{rlmt\_skip\_in\_CE} (op) & bool & 1 & Skip RLOF if $r<R_\ast$ \\
+\texttt{rlmt\_substep\_max\_dm} (op) & — & $10^{-3}$ & Max $|\Delta M|/M$ per sub–step \\
+\texttt{rlmt\_substep\_max\_dr} (op) & — & $5\times10^{-3}$ & Max $|\Delta r|/r$ per sub–step \\
+\texttt{rlmt\_min\_substeps} (op) & int & 3 & Minimum sub–steps \\
+\texttt{ce\_profile\_file} (op) & path & — & Table $(s,\rho,c_s)$ for CE \\
+\texttt{ce\_rho0}, \texttt{ce\_cs} (op) & dens, speed & — & Power–law CE normalization \\
+\texttt{ce\_alpha\_rho}, \texttt{ce\_alpha\_cs} (op) & — & 0 & Power–law slopes \\
+\texttt{ce\_xmin} (op) & — & $10^{-4}$ & Coulomb cutoff \\
+\texttt{ce\_Qd} (op) & — & 0 & Geometric drag coefficient \\
+\texttt{ce\_kick\_cfl} (op) & — & 1 & Velocity–kick limiter \\
+\texttt{ce\_reaction\_on\_donor} (op) & bool & 0 & Apply opposite CE kick to donor \\
+\texttt{merge\_eps} (op) & length & $0.5\min(R_\ast,R_{\rm a})$ & Merge radius (with floor) \\
+\texttt{rlmt\_R\_slope} (part) & — & 0 & Donor mass–radius exponent $\alpha_R$ \\
+\texttt{rlmt\_R\_ref\_mass}, \texttt{rlmt\_R\_ref\_radius} (part) & M, L & donor’s & $R(M)$ references \\
+\texttt{rlmt\_last\_dE} (op, out) & energy & — & Energy change (diagnostic) \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\noindent\textbf{Particle parameter:}
-\begin{table}[h]
-\centering\footnotesize
-\begin{tabular}{@{}lll@{}}
-\toprule
-Field               & Unit               & Description                               \\
-\midrule
-\texttt{pn\_spin}    & mass\,$L^2$/time   & Spin angular-momentum vector (\texttt{reb\_vec3d}, optional)   \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-Setting the effect parameter \texttt{c} to the appropriate ratio of code
-units to physical units reproduces the post\hyp Newtonian spin couplings and
-gravitational\hyp wave driven inspiral
-\citep{Peters1964,Kidder1995}.
+\paragraph{Notes.}
+All scalar parameters are read as doubles by REBOUNDx and cast to integers for
+indices/toggles. If available in your build, a filename in
+\texttt{ce\_profile\_file} can be provided to load a CE table; otherwise the
+power–law model is used.
 
 
-
-%-------------------------------------------------------------------------------
-\section{Discussion and Future Extensions}
-\label{sec:future}
-Future work may add direct coupling to tabulated stellar‑evolution tracks
-so that $R_*(M)$ and $H_P(M)$ evolve self‑consistently.
 
 %-------------------------------------------------------------------------------
 \section{Conclusions}
@@ -708,6 +629,7 @@ development of these effects.
   Verbunt,~F. \& Zwaan,~C.\ 1981, \emph{A\&A}, 100, L7.
 \bibitem[Hurley et~al.(2000)]{Hurley2000}
   Hurley,~J.~R., Pols,~O.~R., \& Tout,~C.~A.\ 2000, \emph{MNRAS}, 315, 543.
+  \bibitem[Parker(1958)]{parker} Parker, E.~N.\ 1958, ApJ, 128, 664. doi:10.1086/146579
 \end{thebibliography}
 
 \end{document}
