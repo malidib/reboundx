@@ -13,8 +13,8 @@
  * rlmt_loss_fraction    (double)            – wind fraction f_loss in [0,1]     (default 0)
  * jloss_mode            (double)            – 0 donor wind (v_loss = v_d)
  *                                            1 isotropic re‑emission (v_a)
- *                                            2 Jeans (v_CM)
- *                                            3 scale × j_orb (target j)         (default 0)
+ *                                            2 COM‑loss (v_CM; zero‑j)
+ *                                            3 scale × (J/M) (target j)         (default 0)
  * jloss_factor          (double)            – scale for mode 3 (default 1.0)
  * rlmt_skip_in_CE       (double, bool)      – skip RLOF if r < R_d               (default 1)
  * rlmt_substep_max_dm   (double)            – max |ΔM|/M per sub‑step            (default 1e‑3)
@@ -79,7 +79,7 @@ struct ce_profile {
     double* rho;    /* density */
     double* cs;     /* sound speed */
 };
-static struct ce_profile ce_tab = {0, NULL, NULL};
+static struct ce_profile ce_tab = {0, NULL, NULL, NULL};
 
 /* Load (s, rho, cs) ASCII table. Returns 1 on success, 0 otherwise. */
 static int ce_profile_load(const char* fname){
@@ -99,6 +99,10 @@ static int ce_profile_load(const char* fname){
     ce_tab.cs  = (double*)malloc((size_t)cap*sizeof(double));
     if(!ce_tab.s || !ce_tab.rho || !ce_tab.cs){
         fprintf(stderr, "[rlmt] Out of memory reading CE profile.\n");
+        if(ce_tab.s)  free(ce_tab.s);
+        if(ce_tab.rho)free(ce_tab.rho);
+        if(ce_tab.cs) free(ce_tab.cs);
+        ce_tab.s = ce_tab.rho = ce_tab.cs = NULL;
         fclose(f);
         return 0;
     }
@@ -115,6 +119,11 @@ static int ce_profile_load(const char* fname){
             double* ncs = (double*)realloc(ce_tab.cs,  (size_t)cap*sizeof(double));
             if(!ns || !nr || !ncs){
                 fprintf(stderr, "[rlmt] Out of memory expanding CE profile.\n");
+                if(ns)  ce_tab.s   = ns;   /* keep valid pointers for free */
+                if(nr)  ce_tab.rho = nr;
+                if(ncs) ce_tab.cs  = ncs;
+                free(ce_tab.s); free(ce_tab.rho); free(ce_tab.cs);
+                ce_tab.s = ce_tab.rho = ce_tab.cs = NULL;
                 fclose(f);
                 return 0;
             }
@@ -174,12 +183,12 @@ static inline double dot3(const double ax, const double ay, const double az,
 static void unit_perp_to(const double nx, const double ny, const double nz,
                          double* ex, double* ey, double* ez){
     /* try cross with z‑axis first, then x‑axis */
-    double cx = ny*1.0 - nz*0.0;  /* n × ez */
+    double cx = ny*1.0 - nz*0.0;  /* n × ez = (ny, -nx, 0) */
     double cy = nz*0.0 - nx*1.0;
     double cz = nx*0.0 - ny*0.0;
     double nrm = sqrt(cx*cx + cy*cy + cz*cz);
     if(nrm < 1e-12){
-        cx = ny*0.0 - nz*0.0;     /* n × ex */
+        cx = ny*0.0 - nz*0.0;     /* n × ex = (0, nz, -ny) */
         cy = nz*1.0 - nx*0.0;
         cz = nx*0.0 - ny*1.0;
         nrm = sqrt(cx*cx + cy*cy + cz*cz);
@@ -197,10 +206,20 @@ static double mach_piece_sub(const double M){
     return 0.5*log((1.+M)/(1.-M)) - M;     /* analytic for 0.02 ≤ M < 1 */
 }
 static double I_prefactor(const double M, const double xmin){
+    /* Coulomb log; xmin stands in for r_min/r_max (dimensionless) */
     const double coul = log(1.0/xmin);
-    if(M >= 1.0) return coul;
-    /* cap by Coulomb log to keep continuous across regimes */
-    return MIN2(coul, mach_piece_sub(M));
+
+    if(M > 1.0){
+        /* Supersonic: I = ln Λ + 0.5 ln(1 - M^{-2}); keep numerically safe near M→1+ */
+        const double M2 = M*M;
+        double arg = 1.0 - 1.0/M2;
+        if(arg < 1e-12) arg = 1e-12;              /* avoid log(0) */
+        return coul + 0.5*log(arg);
+    } else {
+        /* Subsonic: cap by Coulomb log to avoid the formal divergence as M→1- */
+        const double Isub = mach_piece_sub(M);
+        return MIN2(coul, Isub);
+    }
 }
 
 /* ========================================================================= */
@@ -400,13 +419,14 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
             } else if(jloss_mode == 3){
                 /* choose tangential unit vector and set |Δv| to achieve target j */
                 double exu, eyu, ezu; unit_perp_to(nx, ny, nz, &exu, &eyu, &ezu);
-                /* j_orb = |r × v| / μ  with r = donor - accretor, v = v_rel */
+                /* h = |r × v_rel|; J/M = (μ h)/Mtot */
                 double Lx, Ly, Lz; cross3(dx, dy, dz, vrelx, vrely, vrelz, &Lx, &Ly, &Lz);
-                const double Lmag = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99;
-                const double mu   = (Md0*Ma0) / (Md0 + Ma0);
-                const double j_orb = Lmag / mu;
+                const double Lmag  = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99; /* h */
+                const double Mtot  = Md0 + Ma0;
+                const double mu    = (Md0*Ma0) / Mtot;
+                const double j_orb = (mu * Lmag) / Mtot;                  /* J/M */
                 const double j_target = jloss_factor * j_orb;
-                const double fac = j_target / r;  /* speed to achieve j_target at radius r (donor) */
+                const double fac = j_target / r;  /* speed to achieve j_target at donor radius */
                 vx_loss = d->vx + fac*exu;
                 vy_loss = d->vy + fac*eyu;
                 vz_loss = d->vz + fac*ezu;
@@ -477,7 +497,7 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                 double rex, rey, rez;  /* emission point relative to COM */
                 if(jloss_mode == 1){      /* accretor wind */
                     rex = a->x - Rcmx; rey = a->y - Rcmy; rez = a->z - Rcmz;
-                } else if(jloss_mode == 2){ /* Jeans (COM) */
+                } else if(jloss_mode == 2){ /* COM‑loss (zero‑j) */
                     rex = rey = rez = 0.0;
                 } else {                   /* donor wind or mode 3 baseline from donor */
                     rex = d->x - Rcmx; rey = d->y - Rcmy; rez = d->z - Rcmz;
@@ -487,11 +507,12 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                 if(jloss_mode == 3){
                     /* Target |ΔL| = m_wind * j_target along orbital L‑hat */
                     double Lx, Ly, Lz; cross3(dx, dy, dz, vrelx, vrely, vrelz, &Lx, &Ly, &Lz);
-                    const double Lmag = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99;
-                    const double mu   = (d->m*a->m) / (d->m + a->m);
-                    const double j_orb = Lmag / mu;
+                    const double Lmag  = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99; /* h */
+                    const double Mtot  = d->m + a->m;
+                    const double mu    = (d->m*a->m) / Mtot;
+                    const double j_orb = (mu * Lmag) / Mtot;                  /* J/M */
                     const double j_target = jloss_factor * j_orb;
-                    const double scaleL = m_wind * j_target / Lmag;
+                    const double scaleL = m_wind * j_target / Lmag;           /* ΔL magnitude / h */
                     DLx = scaleL * Lx; DLy = scaleL * Ly; DLz = scaleL * Lz;
                 } else {
                     /* Use ΔL_wind = m_wind * (r_emit × v_loss) */
@@ -556,7 +577,8 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                     const double I = I_prefactor(vrel_eff / cs, xmin);
 
                     /* Ostriker drag on accretor */
-                    const double fc = 4.0 * M_PI * sim->G*sim->G * a->m * rho / (vrel_eff*vrel_eff*vrel_eff) * I;
+                    const double fc = 4.0 * M_PI * sim->G*sim->G * a->m * rho
+                                      / (vrel_eff*vrel_eff*vrel_eff) * I;
 
                     double dvx = -fc * vrelx * dt;
                     double dvy = -fc * vrely * dt;
