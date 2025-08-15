@@ -75,7 +75,7 @@ Our goal is to make these processes available, documented, and reproducible with
 
 \subsection{Simplified Stellar Evolution}
 \label{sec:sse}
-Some of the effects implemented below depends on having self-consistent evolution of the stellar radius and luminosity as a function of mass.
+Some of the effects implemented below depend on having self-consistent evolution of the stellar radius and luminosity as functions of mass.
 
 To supply mass-dependent stellar properties the optional
 \texttt{stellar\_evolution\_sse} operator updates each star's radius and
@@ -85,6 +85,7 @@ particle of mass $M$ (in $M_\odot$) we set
 R = R_{\rm coeff} R_\odot \left(\frac{M}{M_\odot}\right)^{R_{\rm exp}},\qquad
 L = L_{\rm coeff} L_\odot \left(\frac{M}{M_\odot}\right)^{L_{\rm exp}}.
 \]
+The update is purely algebraic: the timestep is ignored and the relations are evaluated using the particle's current mass each call.
 
 The mass ratio $M/M_\odot$ uses the operator-level parameter
 \texttt{sse\_Msun} (default 1) to convert code masses into solar masses;
@@ -124,7 +125,7 @@ $R$, the mass-loss rate is
 \dot M = -4\times10^{-13}\,\eta\,\frac{L}{L_\odot}\frac{R}{R_\odot}\frac{M_\odot}{M}
 \;M_\odot\,\mathrm{yr}^{-1},
 \]
-where the dimensionless efficiency $\eta$ and luminosity $L$ (\texttt{sse$\_$L} defined above) are specified per particle, while $R$ is taken from the particle's radius field.
+where the dimensionless efficiency $\eta$ and luminosity $L$ (\texttt{sse$\_$L} defined above) are specified per particle, while $R$ is taken from the particle's radius field. Stars lacking either parameter are skipped.
 Mass is removed isotropically with no linear-momentum
 recoil; virtual particles are ignored and after mass loss the system is
 recentred on the centre of mass.  A safety limiter caps the fractional
@@ -174,7 +175,7 @@ defaults $(\alpha_R,\alpha_L,\alpha_M)=(2,\tfrac{3}{2},1)$.  The luminosity
 $L$ is read from the particle attribute \texttt{sse\_L}, which must be
 populated either by the simplified stellar‑evolution operator or manually by
 the user, while $R$ and $M$ are taken from the particle's $r$ and $m$ fields.
-Mass is removed isotropically
+Stars missing $\eta$ or $L$ are skipped. Mass is removed isotropically
 with no linear-momentum recoil; virtual particles are ignored, and after mass
 loss the system is recentred on the centre of mass.  The prefactor, solar
 reference values, exponents, maximum fractional mass change, and the year
@@ -601,8 +602,10 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{rlmt\_substep\_max\_dr} (op) & — & $5\times10^{-3}$ & Max $|\Delta r|/r$ per sub–step \\
 \texttt{rlmt\_min\_substeps} (op) & int & 3 & Minimum sub–steps \\
 \texttt{ce\_profile\_file} (op) & path & — & Table $(s,\rho,c_s)$ for CE \\
-\texttt{ce\_rho0}, \texttt{ce\_cs} (op) & dens, speed & — & Power–law CE normalization \\
-\texttt{ce\_alpha\_rho}, \texttt{ce\_alpha\_cs} (op) & — & 0 & Power–law slopes \\
+\texttt{ce\_rho0} (op) & dens & — & CE density normalisation \\
+\texttt{ce\_alpha\_rho} (op) & — & 0 & Density slope \\
+\texttt{ce\_cs} (op) & speed & — & CE sound-speed normalisation \\
+\texttt{ce\_alpha\_cs} (op) & — & 0 & Sound-speed slope \\
 \texttt{ce\_xmin} (op) & — & $10^{-4}$ & Coulomb cutoff \\
 \texttt{ce\_Qd} (op) & — & 0 & Geometric drag coefficient \\
 \texttt{ce\_kick\_cfl} (op) & — & 1 & Velocity–kick limiter \\
