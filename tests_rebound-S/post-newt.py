@@ -41,7 +41,6 @@ rebx.add_force(pn)
 pn.params["c"] = c_au_per_yr              # AU/yr
 
 # Optional switches (default 1). You can toggle pieces as needed.
-pn.params["pn_15PN"] = 1
 pn.params["pn_2PN"]  = 1
 pn.params["pn_25PN"] = 1
 

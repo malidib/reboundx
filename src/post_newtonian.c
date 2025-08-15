@@ -1,18 +1,16 @@
 /**
  * @file    post_newtonian.c
- * @brief   Post-Newtonian relativistic corrections: 1.5PN (SO), 2PN (PM+SS), 2.5PN (RR).
+ * @brief   Post-Newtonian relativistic corrections: 2PN (PM+SS), 2.5PN (RR).
  *
  * Implements the harmonic-coordinate point-mass equations of motion from
  * Kidder (1995, Phys. Rev. D 52, 821) for every massive pair, *omitting 1PN*.
  *
- *  – 1.5 PN : spin–orbit couplings (SO)
  *  – 2 PN   : conservative point-mass (PM) + spin–spin (SS) corrections
  *  – 2.5 PN : gravitational-wave radiation reaction (RR)
  *
  * Effect parameters
  * -----------------
  * c        (double, required)  – speed of light in simulation units
- * pn_15PN  (double,bool, opt.) – include 1.5 PN spin–orbit terms (default: 1)
  * pn_2PN   (double,bool, opt.) – include 2 PN terms (PM + SS)   (default: 1)
  * pn_25PN  (double,bool, opt.) – include 2.5 PN terms           (default: 1)
  *
@@ -46,7 +44,6 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
                                struct reb_particle*   const pj,
                                const double                 G,
                                const double                 c,
-                               const int                    do15PN,
                                const int                    do2PN,
                                const int                    do25PN)
 {
@@ -82,61 +79,6 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
 
     /* Build relative-acceleration contributions */
     double ax = 0.0, ay = 0.0, az = 0.0;
-
-    /* --------------------------------------------------------------------- */
-    /* 1.5 PN spin–orbit (Kidder 1995 Eq. 2.2c)                              */
-    /* Using physical spins S_i (mass·L^2/T). Prefactor G/(c^2 r^3).         */
-    /* --------------------------------------------------------------------- */
-    if (do15PN){
-        struct rebx_extras* const rx = sim->extras;
-        const reb_vec3d* Spi = rebx_get_param_vec(rx, pi->ap, "pn_spin");
-        const reb_vec3d* Spj = rebx_get_param_vec(rx, pj->ap, "pn_spin");
-
-        if (Spi || Spj){
-            const reb_vec3d Si = Spi ? *Spi : (reb_vec3d){0.0,0.0,0.0};
-            const reb_vec3d Sj = Spj ? *Spj : (reb_vec3d){0.0,0.0,0.0};
-
-            /* Combined spin vectors per Kidder’s notation */
-            const double dm   = pi->m - pj->m;
-            const double dm_m = dm / m;
-
-            const reb_vec3d S  = (reb_vec3d){ Si.x + Sj.x,
-                                              Si.y + Sj.y,
-                                              Si.z + Sj.z };
-            const reb_vec3d D  = (reb_vec3d){ m*(Sj.x/pj->m - Si.x/pi->m),
-                                              m*(Sj.y/pj->m - Si.y/pi->m),
-                                              m*(Sj.z/pj->m - Si.z/pi->m) };
-
-            const reb_vec3d S_eff = (reb_vec3d){ 2.0*S.x + dm_m*D.x,
-                                                 2.0*S.y + dm_m*D.y,
-                                                 2.0*S.z + dm_m*D.z };    /* "A2" */
-            const reb_vec3d S7    = (reb_vec3d){ 7.0*S.x + 3.0*dm_m*D.x,
-                                                 7.0*S.y + 3.0*dm_m*D.y,
-                                                 7.0*S.z + 3.0*dm_m*D.z };
-            const reb_vec3d S3    = (reb_vec3d){ 3.0*S.x + dm_m*D.x,
-                                                 3.0*S.y + dm_m*D.y,
-                                                 3.0*S.z + dm_m*D.z };
-
-            /* Cross products/couplings */
-            const reb_vec3d nxv = (reb_vec3d){ ny*dvz - nz*dvy,
-                                               nz*dvx - nx*dvz,
-                                               nx*dvy - ny*dvx };
-            const double nxv_dot_S_eff = nxv.x*S_eff.x + nxv.y*S_eff.y + nxv.z*S_eff.z;
-
-            const reb_vec3d vXS7 = (reb_vec3d){ dvy*S7.z - dvz*S7.y,
-                                                dvz*S7.x - dvx*S7.z,
-                                                dvx*S7.y - dvy*S7.x };
-            const reb_vec3d nXS3 = (reb_vec3d){ ny*S3.z - nz*S3.y,
-                                                nz*S3.x - nx*S3.z,
-                                                nx*S3.y - ny*S3.x };
-
-            const double pref15 = (G/(c*c)) * invr2 * invr;  /* G/(c^2 r^3) */
-
-            ax += pref15 * ( 6.0*nx*nxv_dot_S_eff - vXS7.x + 3.0*rdot*nXS3.x );
-            ay += pref15 * ( 6.0*ny*nxv_dot_S_eff - vXS7.y + 3.0*rdot*nXS3.y );
-            az += pref15 * ( 6.0*nz*nxv_dot_S_eff - vXS7.z + 3.0*rdot*nXS3.z );
-        }
-    }
 
     /* --------------------------------------------------------------------- */
     /* 2 PN conservative: point‑mass (Kidder 1995 Eq. 2.2d)                  */
@@ -221,7 +163,6 @@ static void rebx_calculate_post_newtonian(struct reb_simulation* const sim,
                                           struct reb_particle*   const particles,
                                           const int                        N,
                                           const double                     c,
-                                          const int                        do15PN,
                                           const int                        do2PN,
                                           const int                        do25PN)
 {
@@ -231,7 +172,7 @@ static void rebx_calculate_post_newtonian(struct reb_simulation* const sim,
     for (int i = 0; i < N; i++){
         for (int j = i+1; j < N; j++){
             pn_add_pair(sim, &particles[i], &particles[j],
-                        G, c, do15PN, do2PN, do25PN);
+                        G, c, do2PN, do25PN);
         }
     }
 }
@@ -252,12 +193,9 @@ void rebx_post_newtonian(struct reb_simulation* const sim,
         return;
     }
 
-    int do15PN = 1, do2PN = 1, do25PN = 1;
+    int do2PN = 1, do25PN = 1;
 
     const double* d;
-
-    d = rebx_get_param(rx, force->ap, "pn_15PN");
-    if (d) do15PN = (*d != 0.0);
 
     d = rebx_get_param(rx, force->ap, "pn_2PN");
     if (d) do2PN = (*d != 0.0);
@@ -265,5 +203,5 @@ void rebx_post_newtonian(struct reb_simulation* const sim,
     d = rebx_get_param(rx, force->ap, "pn_25PN");
     if (d) do25PN = (*d != 0.0);
 
-    rebx_calculate_post_newtonian(sim, particles, N, *c_ptr, do15PN, do2PN, do25PN);
+    rebx_calculate_post_newtonian(sim, particles, N, *c_ptr, do2PN, do25PN);
 }
