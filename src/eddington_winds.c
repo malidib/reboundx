@@ -68,6 +68,11 @@ void rebx_eddington_winds(struct reb_simulation* const sim,
 
     #undef GET
 
+    const double* pDisCE   = rebx_get_param(rx, op->ap, "edw_disable_in_CE");
+    const double* pDisRLOF = rebx_get_param(rx, op->ap, "edw_disable_in_RLOF");
+    const int disable_in_CE   = pDisCE   ? (int)llround(*pDisCE)   : 1;
+    const int disable_in_RLOF = pDisRLOF ? (int)llround(*pDisRLOF) : 1;
+
     const double pref = (C0 * Msun) / year_len; /* code mass per code time */
 
     /* ----------------- iterate over real particles ----------------- */
@@ -78,6 +83,13 @@ void rebx_eddington_winds(struct reb_simulation* const sim,
         /* Stellar luminosity supplied via sse_L (e.g. from SSE operator) */
         const double* Lp = rebx_get_param(rx, p->ap, "sse_L");
         if (!Lp) continue;
+
+        const double* inCE = rebx_get_param(rx, p->ap, "inside_CE");
+        const double* rlof = rebx_get_param(rx, p->ap, "rlof_active");
+        if ( (disable_in_CE   && inCE  && *inCE  > 0.5) ||
+             (disable_in_RLOF && rlof && *rlof > 0.5) ){
+            continue;
+        }
 
         const double L = *Lp;
         if (!isfinite(L) || L <= 0.0) continue;

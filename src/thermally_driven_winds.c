@@ -77,6 +77,11 @@ void rebx_thermally_driven_winds(struct reb_simulation* const sim,
     GET("tdw_max_dlnM", max_dlnM );
     #undef GET
 
+    const double* pDisCE   = rebx_get_param(rx, op->ap, "tdw_disable_in_CE");
+    const double* pDisRLOF = rebx_get_param(rx, op->ap, "tdw_disable_in_RLOF");
+    const int disable_in_CE   = pDisCE   ? (int)llround(*pDisCE)   : 1;
+    const int disable_in_RLOF = pDisRLOF ? (int)llround(*pDisRLOF) : 1;
+
     /* Convert the prefactor to code‑mass per code‑time */
     const double pref = (C0 * Msun) / year_len;
 
@@ -87,6 +92,13 @@ void rebx_thermally_driven_winds(struct reb_simulation* const sim,
         const double* eta_ptr = rebx_get_param(rx, p->ap, "tdw_eta");
         const double* L_ptr   = rebx_get_param(rx, p->ap, "sse_L");
         if (!eta_ptr || !L_ptr) continue;
+
+        const double* inCE = rebx_get_param(rx, p->ap, "inside_CE");
+        const double* rlof = rebx_get_param(rx, p->ap, "rlof_active");
+        if ( (disable_in_CE   && inCE  && *inCE  > 0.5) ||
+             (disable_in_RLOF && rlof && *rlof > 0.5) ){
+            continue;
+        }
 
         const double eta = *eta_ptr;
         const double L   = *L_ptr;

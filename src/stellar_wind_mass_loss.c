@@ -54,19 +54,24 @@ void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
     double year_len = 1.0;    /* code‑time units per Julian year            */
     double max_dlnM = 0.1;    /* safety limiter                             */
 
-    const double* pM  = rebx_get_param(rx, op->ap, "swml_Msun");
-    const double* pR  = rebx_get_param(rx, op->ap, "swml_Rsun");
-    const double* pL  = rebx_get_param(rx, op->ap, "swml_Lsun");
-    const double* pC  = rebx_get_param(rx, op->ap, "swml_const");
-    const double* pYr = rebx_get_param(rx, op->ap, "swml_year");
-    const double* pMax= rebx_get_param(rx, op->ap, "swml_max_dlnM");
+    const double* pM   = rebx_get_param(rx, op->ap, "swml_Msun");
+    const double* pR   = rebx_get_param(rx, op->ap, "swml_Rsun");
+    const double* pL   = rebx_get_param(rx, op->ap, "swml_Lsun");
+    const double* pC   = rebx_get_param(rx, op->ap, "swml_const");
+    const double* pYr  = rebx_get_param(rx, op->ap, "swml_year");
+    const double* pMax = rebx_get_param(rx, op->ap, "swml_max_dlnM");
+    const double* pDisCE   = rebx_get_param(rx, op->ap, "swml_disable_in_CE");
+    const double* pDisRLOF = rebx_get_param(rx, op->ap, "swml_disable_in_RLOF");
 
     if (pM  && isfinite(*pM ) && *pM  > 0.0) Msun     = *pM;
     if (pR  && isfinite(*pR ) && *pR  > 0.0) Rsun     = *pR;
     if (pL  && isfinite(*pL ) && *pL  > 0.0) Lsun     = *pL;
     if (pC  && isfinite(*pC ) && *pC  > 0.0) C0       = *pC;
-    if (pYr && isfinite(*pYr) && *pYr > 0.0) year_len = *pYr;
+    if (pYr  && isfinite(*pYr ) && *pYr  > 0.0) year_len = *pYr;
     if (pMax && isfinite(*pMax) && *pMax > 0.0) max_dlnM = *pMax;
+
+    const int disable_in_CE   = pDisCE   ? (int)llround(*pDisCE)   : 1;
+    const int disable_in_RLOF = pDisRLOF ? (int)llround(*pDisRLOF) : 1;
 
     /* Prefactor converted to *code‑mass per code‑time* */
     const double pref = (C0 * Msun) / year_len;      /* [code‑mass / code‑time] */
@@ -80,6 +85,13 @@ void rebx_stellar_wind_mass_loss(struct reb_simulation* const sim,
         const double* L_ptr   = rebx_get_param(rx, p->ap, "sse_L");
 
         if (!eta_ptr || !L_ptr) continue;
+
+        const double* inCE = rebx_get_param(rx, p->ap, "inside_CE");
+        const double* rlof = rebx_get_param(rx, p->ap, "rlof_active");
+        if ( (disable_in_CE   && inCE  && *inCE  > 0.5) ||
+             (disable_in_RLOF && rlof && *rlof > 0.5) ){
+            continue;
+        }
 
         const double eta = *eta_ptr;
         const double L   = *L_ptr;
