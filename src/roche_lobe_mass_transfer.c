@@ -29,9 +29,15 @@
  * ---------------------------------------
  * rlmt_Hp               (double, donor)     – pressure scale height H_P
  * rlmt_mdot0            (double, donor)     – reference mass‑loss rate \dot M_0  (>0)
- * rlmt_R_slope          (double, donor)     – d ln R / d ln M exponent α_R       (default 0)
- * rlmt_R_ref_mass       (double, donor)     – reference mass for R(M)            (default donor’s current)
- * rlmt_R_ref_radius     (double, donor)     – reference radius for R(M)          (default donor’s current)
+ *
+ * To supply mass‑dependent stellar properties, combine this operator with
+ * `stellar_evolution_sse`, which updates each star's radius and luminosity via
+ *
+ *     R = R_coeff R_\odot (M/M_\odot)^{R_exp},
+ *     L = L_coeff L_\odot (M/M_\odot)^{L_exp}.
+ *
+ * The update is purely algebraic: the timestep is ignored and the relations
+ * are evaluated using the particle's current mass each call.
  *
  * CE power‑law (operator scope; used if no table)
  * -----------------------------------------------
@@ -542,17 +548,10 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                   }
               }
 
-            /* --- donor mass‑radius relation (optional) --- */
-            const double* p_Rslope = rebx_get_param(rx, d->ap, "rlmt_R_slope");
-            if(p_Rslope && *p_Rslope != 0.0 && d->m > 0.0){
-                const double alpha = *p_Rslope;
-                const double* p_Mref = rebx_get_param(rx, d->ap, "rlmt_R_ref_mass");
-                const double* p_Rref = rebx_get_param(rx, d->ap, "rlmt_R_ref_radius");
-                const double Mref = (p_Mref && *p_Mref > 0.0) ? *p_Mref : Md0;
-                const double Rref = (p_Rref && *p_Rref > 0.0) ? *p_Rref : d->r;
-                if(Mref > 0.0 && Rref > 0.0){
-                    d->r = Rref * pow(d->m / Mref, alpha);
-                }
+            /* --- optional stellar evolution update --- */
+            struct rebx_operator* sse = rebx_get_operator(rx, "stellar_evolution_sse");
+            if(sse && sse->step_function){
+                sse->step_function(sim, sse, 0.0);
             }
         } /* end RLOF */
 
