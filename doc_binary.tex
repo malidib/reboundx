@@ -496,29 +496,39 @@ leaves the system.
 \paragraph{Linear momentum (exact).}
 Conservative accretion is treated internally: $m_{\rm acc}$ is added to the
 accretor with the donor’s instantaneous velocity, while the donor’s mass is
-reduced; this leaves the pair’s total momentum unchanged. Systemic wind
-removes linear momentum $m_{\rm wind}\,\mathbf v_{\rm loss}$; the code applies a
-uniform shift to both stars so that
-$\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$ exactly.
+reduced; this leaves the pair’s total momentum unchanged.  When systemic wind
+is present, the donor’s mass decrement automatically removes
+$m_{\rm wind}\,\mathbf v_{\rm d}$.  The operator then applies a uniform shift
+$-m_{\rm wind}(\mathbf v_{\rm loss}-\mathbf v_{\rm d})$ to both stars so that the
+total change is
+$\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$.
 
 \paragraph{$j$–loss (wind angular momentum).}
 The specific angular momentum carried by the wind is prescribed by a mode
 parameter:
 \begin{align*}
-\text{mode 0:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm d}\quad\Rightarrow\quad
-\Delta\mathbf L_{\rm wind} = m_{\rm wind}\,(\mathbf r_{\rm d}\!-\mathbf R_{\rm CM}) \times \mathbf v_{\rm d},\\
-\text{mode 1:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm a}\quad\Rightarrow\quad
-\Delta\mathbf L_{\rm wind} = m_{\rm wind}\,(\mathbf r_{\rm a}\!-\mathbf R_{\rm CM}) \times \mathbf v_{\rm a},\\
-\text{mode 2:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm CM}\quad\Rightarrow\quad
-\Delta\mathbf L_{\rm wind}=\mathbf 0\quad,\\
-\text{mode 3:}~&|\Delta\mathbf L_{\rm wind}|=m_{\rm wind}\,f_j\,j_{\rm orb},\qquad
-j_{\rm orb}\equiv\frac{J}{M}=\frac{\mu\,|\mathbf r\times\mathbf v|}{M_{\rm d}+M_{\rm a}},
-\qquad \mu=\frac{M_{\rm d}M_{\rm a}}{M_{\rm d}+M_{\rm a}}.
+\text{mode 0:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm d},\\
+\text{mode 1:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm a},\\
+\text{mode 2:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm CM},\\
+\text{mode 3 (target-}j\text{):}~&|\mathbf v_{\rm loss}-\mathbf v_{\rm d}| = f_j\,\frac{j_{\rm orb}}{r}\,\text{along}\,\hat e_\perp\!\perp\hat{\mathbf r},\\
+&\Delta\mathbf L_{\rm wind} = m_{\rm wind}(\mathbf r_{\rm d}-\mathbf R_{\rm CM}) \times (\mathbf v_{\rm loss}-\mathbf v_{\rm d}),\\
+&|\Delta\mathbf L_{\rm wind}| = m_{\rm wind}f_j j_{\rm orb}\,\frac{|\mathbf r_{\rm d}-\mathbf R_{\rm CM}|}{r}.
 \end{align*}
-with $\Delta\mathbf L_{\rm wind}$ aligned with the orbital angular momentum.
-After the linear momentum update, the code applies a \emph{pure torque}
-(zero net impulse) so that the pair’s orbital angular momentum is reduced by
-exactly $\Delta\mathbf L_{\rm wind}$.
+Here $j_{\rm orb}\equiv J/M = \mu |\mathbf r\times\mathbf v|/(M_{\rm d}+M_{\rm a})$ with
+reduced mass $\mu=M_{\rm d}M_{\rm a}/(M_{\rm d}+M_{\rm a})$.  The torque direction is
+$(\mathbf r_{\rm d}-\mathbf R_{\rm CM})\times\hat e_\perp$ and is generally not
+forced to align with the orbital angular momentum in 3D.  If alignment or the
+full $m_{\rm wind}f_j j_{\rm orb}$ magnitude is required, interpret $f_j$ as an
+effective scaling by $r/|\mathbf r_{\rm d}-\mathbf R_{\rm CM}|$ and/or constrain
+$\hat e_\perp$ to lie in the orbital plane.  After the linear momentum update,
+the code applies a \emph{pure torque} (zero net impulse) so that the pair’s
+orbital angular momentum is reduced by $\Delta\mathbf L_{\rm wind}$.
+
+\textit{Notes.} For modes 0 and 1, no additional wind torque is applied because
+$\mathbf v_{\rm loss}=\mathbf v_{\rm emit}$; the angular momentum
+$m_{\rm wind}(\mathbf r_{\rm emit}-\mathbf R_{\rm CM})\times\mathbf v_{\rm emit}$ is
+removed implicitly by the mass decrement.  The “wind–$\Delta L$” step only acts
+when $\mathbf v_{\rm loss}\ne\mathbf v_{\rm emit}$.
 
 \paragraph{Conservative transfer angular momentum.}
 In the absence of external torques, conservative mass relocation should not
