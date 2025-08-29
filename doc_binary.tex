@@ -219,6 +219,8 @@ and after mass loss the system is recentred on the centre of mass. A limiter
 caps the fractional mass change at \texttt{edw\_max\_dlnM} per call. Operator
 parameters controlling the scaling constants are listed in
 Table~\ref{tab:edw}.
+For convenience, operator-level parameters also accept synonyms with the
+prefixes \texttt{eddw\_} and \texttt{ew\_}.
 By default the operator skips stars flagged as being inside a common envelope
 or undergoing Roche--lobe overflow, controlled by
 \texttt{edw\_disable\_in\_CE} and \texttt{edw\_disable\_in\_RLOF}, which read
@@ -540,11 +542,13 @@ with
 \]
 so that the total momentum change is
 \[
-\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm d} 
+\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm d}
 -\,m_{\rm wind}(\mathbf v_{\rm loss}-\mathbf v_{\rm emit}).
 \]
 Hence $\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$ holds
 \emph{only} for modes 0 and 3 (where $\mathbf v_{\rm emit}=\mathbf v_{\rm d}$).
+After the mass and velocity updates each sub-step the simulation is moved to
+the centre of mass to keep the reference frame consistent.
 
 
 
