@@ -40,17 +40,7 @@
 
 %-------------------------------------------------------------------------------
 \begin{abstract}
-We document the binary‑star evolution modules distributed with
-\textsc{REBOUNDx} $\ge$ 3.12 (revision B, 10 Jul 2025).
-The Roche‑lobe mass transfer operator combines overflow, non‑conservative
-systemic winds, and common‑envelope drag within a momentum‑conserving
-framework featuring adaptive sub‑stepping and robust merge guards.
-Separate operators implement magnetic braking, isotropic stellar‑wind
-mass loss, thermally driven winds, simplified stellar‑evolution scalings,
-and post‑Newtonian relativistic corrections up to 2.5PN order with spin--spin couplings; spin--orbit terms can be added via the \texttt{lense\_thirring} effect.  Equations are derived,
-parameters are tabulated, and algorithmic
-choices are clarified so that this document can serve as an archival,
-citable reference.
+Close-binary evolution couples Roche–lobe overflow (RLOF), common-envelope (CE) drag, stellar winds, magnetic braking, and gravitational-wave losses, exchanging mass and angular momentum while reshaping orbits and spins. We present interoperable effects in the \textsc{REBOUNDx} extension to \textsc{REBOUND} that embed these processes within high-accuracy $N$-body dynamics. The suite includes: a momentum-conserving RLOF operator with conservative and systemic channels and configurable specific-$j$ loss; a CE drag model based on Mach-dependent dynamical friction with kick limiting; isotropic Reimers winds, Parker-type thermal winds, and Eddington-limited outflows powered by a parametric stellar-evolution module supplying mass-dependent $R$ and $L$; magnetic braking via the Verbunt–Zwaan/Kawaler torque with a saturation-aware closed-form spin update; and post-Newtonian corrections (2,PN point-mass and spin–spin; 2.5,PN radiation reaction). Linear momentum is conserved exactly for conservative transfer, a minimal corrective torque enforces angular-momentum consistency, and adaptive sub-stepping stabilizes evolution near contact. Inter-module flags coordinate wind/RLOF/CE activity. The unit-agnostic framework enables self-consistent, time-resolved studies of close binaries in isolated or dynamically rich settings.
 \end{abstract}
 
 %-------------------------------------------------------------------------------
@@ -61,12 +51,11 @@ Close binary stars evolve under a tightly coupled set of physical processes that
 
 Capturing this multi-physics landscape with a single method remains challenging. Fully three dimensional hydrodynamic calculations can resolve RLOF streams and CE flows, but they are too expensive for long-term evolution or population-scale parameter studies. Conversely, rapid binary–evolution formalisms encode RLOF, winds, magnetic braking, and gravitational–wave losses through secular prescriptions that are efficient and predictive in isolation, yet they generally assume a two-body context and cannot natively account for higher–order gravitational dynamics (e.g., triples, resonant encounters, or cluster potentials) that can modulate or even trigger mass transfer. A complementary approach is to embed vetted secular and dissipative processes within a high-accuracy $N$-body integrator so that orbital dynamics, spin evolution, and mass exchange proceed self-consistently on a common timestep while preserving the bookkeeping demanded by conservation laws.
 
-This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF operator that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific–angular–momentum prescriptions for escaping gas, with optional donor mass–radius responses following power–law scalings \citep{Eggleton1983,Ritter1988,Hurley2000}; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections providing conservative 2\,PN point–mass and spin–spin terms and 2.5\,PN gravitational–wave radiation reaction \citep{Einstein1915,Peters1964,Kidder1995}; 1\,PN and spin--orbit (1.5\,PN) effects are available via the \texttt{gr\_full} and \texttt{lense\_thirring} modules. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
+This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF and CE module that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific angular momentum prescriptions for escaping gas, with optional donor mass–radius responses following power–law scalings \citep{Eggleton1983,Ritter1988,Hurley2000}; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections providing conservative 2\,PN point–mass and spin–spin terms and 2.5\,PN gravitational–wave radiation reaction \citep{Peters1964,Kidder1995}; 1\,PN and spin--orbit (1.5\,PN) effects are available via the \texttt{gr\_full} and \texttt{lense\_thirring} modules. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
 
 Algorithmically, the RLOF/CE module tracks all linear–momentum channels associated with accretion and systemic mass loss and applies a minimal corrective kick to maintain angular–momentum consistency, while adaptive sub-stepping limits the fractional changes in mass and separation per internal step to ensure numerical stability near contact. CE drag is modeled with a Mach-number–dependent dynamical-friction prescription capped by a CFL-like limiter to avoid excessive velocity impulses \citep{Ostriker1999}. The wind and magnetic-braking operators act directly on particle masses and spin vectors, respectively, with safeguards against overshoot in the spin update. The PN module follows the harmonic-gauge two-body equations of motion \citep{Kidder1995} and is split into configurable orders, enabling controlled experiments that isolate conservative precession from dissipative inspiral.
 
-Our goal is to make these processes available, documented, and reproducible within a single $N$-body environment so that studies of close-binary evolution can move seamlessly between isolated binaries and dynamically rich contexts. The remainder of this paper details the physical models and parameterizations (Section~\ref{sec:PhysicalModel}), the numerical implementation and safeguards (Section~\ref{sec:AlgorithmicFlow}), and example applications and recommended usage domains (Section~\ref{sec:future}). By anchoring each operator to established literature \citep{Eggleton1983,Ritter1988,Reimers1975,Verbunt1981,Kawaler1988,Peters1964,Kidder1995,Hurley2000,Ostriker1999}, we aim to provide a citable reference implementation suitable for precision studies of close binaries.
-
+Our goal is to make these processes available, documented, and reproducible within a single $N$-body environment so that studies of close-binary evolution can move seamlessly between isolated binaries and dynamically rich contexts. The remainder of this paper details the physical models and parameterizations (Section~\ref{sec:PhysicalModel}), the numerical implementation and safeguards (Section~\ref{sec:AlgorithmicFlow}), and example applications and recommended usage domains (Section~\ref{sec:future}).
 
 
 %-------------------------------------------------------------------------------
@@ -493,42 +482,38 @@ m_{\rm wind} = f_{\rm loss}\,m_{\rm loss},\quad f_{\rm loss}\in[0,1].
 The accretor’s mass increases by $m_{\rm acc}$; the wind mass $m_{\rm wind}$
 leaves the system.
 
-\paragraph{Linear momentum (exact).}
-Conservative accretion is treated internally: $m_{\rm acc}$ is added to the
-accretor with the donor’s instantaneous velocity, while the donor’s mass is
-reduced; this leaves the pair’s total momentum unchanged.  When systemic wind
-is present, the donor’s mass decrement automatically removes
-$m_{\rm wind}\,\mathbf v_{\rm d}$.  The operator then applies a uniform shift
-$-m_{\rm wind}(\mathbf v_{\rm loss}-\mathbf v_{\rm d})$ to both stars so that the
-total change is
-$\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$.
-
-\paragraph{$j$–loss (wind angular momentum).}
+\paragraph{$j$--loss (wind angular momentum).}
 The specific angular momentum carried by the wind is prescribed by a mode
 parameter:
 \begin{align*}
-\text{mode 0:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm d},\\
-\text{mode 1:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm a},\\
-\text{mode 2:}~&\mathbf v_{\rm loss}=\mathbf v_{\rm CM},\\
-\text{mode 3 (target-}j\text{):}~&|\mathbf v_{\rm loss}-\mathbf v_{\rm d}| = f_j\,\frac{j_{\rm orb}}{r}\,\text{along}\,\hat e_\perp\!\perp\hat{\mathbf r},\\
-&\Delta\mathbf L_{\rm wind} = m_{\rm wind}(\mathbf r_{\rm d}-\mathbf R_{\rm CM}) \times (\mathbf v_{\rm loss}-\mathbf v_{\rm d}),\\
-&|\Delta\mathbf L_{\rm wind}| = m_{\rm wind}f_j j_{\rm orb}\,\frac{|\mathbf r_{\rm d}-\mathbf R_{\rm CM}|}{r}.
+\text{mode 0:}~& \mathbf v_{\rm loss}=\mathbf v_{\rm d}, 
+&&\text{implicit AM loss via donor mass decrement},\\
+\text{mode 1:}~& \mathbf v_{\rm loss}=\mathbf v_{\rm a}, 
+&&\text{implicit AM loss via donor mass decrement},\\
+\text{mode 2:}~& \mathbf v_{\rm loss}=\mathbf v_{\rm CM}, 
+&&\text{no explicit wind torque, but the donor’s mass decrement still removes 
+angular momentum } m_{\rm wind}(\mathbf r_{\rm d}-\mathbf R_{\rm CM})\times\mathbf v_{\rm d},\\
+\text{mode 3 (target-$j$):}~& |\mathbf v_{\rm loss}-\mathbf v_{\rm emit}| 
+= f_j\,j_{\rm orb}/r \quad\text{along }\hat e_\perp\!\perp\hat{\mathbf r},\\
+& j_{\rm orb}\equiv J/M=\mu\,|\mathbf r\times\mathbf v|/(M_{\rm d}+M_{\rm a}),\quad
+\mu=\tfrac{M_{\rm d}M_{\rm a}}{M_{\rm d}+M_{\rm a}},\\
+& \Delta\mathbf L_{\rm wind}
+= m_{\rm wind}(\mathbf r_{\rm emit}-\mathbf R_{\rm CM})\times(\mathbf v_{\rm loss}-\mathbf v_{\rm emit}),\\
+& |\Delta\mathbf L_{\rm wind}| 
+= m_{\rm wind}f_j j_{\rm orb}\,\frac{|\mathbf r_{\rm emit}-\mathbf R_{\rm CM}|}{r}.
 \end{align*}
-Here $j_{\rm orb}\equiv J/M = \mu |\mathbf r\times\mathbf v|/(M_{\rm d}+M_{\rm a})$ with
-reduced mass $\mu=M_{\rm d}M_{\rm a}/(M_{\rm d}+M_{\rm a})$.  The torque direction is
-$(\mathbf r_{\rm d}-\mathbf R_{\rm CM})\times\hat e_\perp$ and is generally not
-forced to align with the orbital angular momentum in 3D.  If alignment or the
-full $m_{\rm wind}f_j j_{\rm orb}$ magnitude is required, interpret $f_j$ as an
-effective scaling by $r/|\mathbf r_{\rm d}-\mathbf R_{\rm CM}|$ and/or constrain
-$\hat e_\perp$ to lie in the orbital plane.  After the linear momentum update,
-the code applies a \emph{pure torque} (zero net impulse) so that the pair’s
-orbital angular momentum is reduced by $\Delta\mathbf L_{\rm wind}$.
+The torque direction is generally not forced to align with the orbital
+angular momentum. If strict alignment or the full 
+$m_{\rm wind}f_j j_{\rm orb}$ magnitude is required, interpret $f_j$ as an
+effective scale factor $r/|\mathbf r_{\rm emit}-\mathbf R_{\rm CM}|$ and/or
+constrain $\hat e_\perp$ to the orbital plane.
 
 \textit{Notes.} For modes 0 and 1, no additional wind torque is applied because
 $\mathbf v_{\rm loss}=\mathbf v_{\rm emit}$; the angular momentum
 $m_{\rm wind}(\mathbf r_{\rm emit}-\mathbf R_{\rm CM})\times\mathbf v_{\rm emit}$ is
 removed implicitly by the mass decrement.  The “wind–$\Delta L$” step only acts
 when $\mathbf v_{\rm loss}\ne\mathbf v_{\rm emit}$.
+
 
 \paragraph{Conservative transfer angular momentum.}
 In the absence of external torques, conservative mass relocation should not
@@ -537,14 +522,39 @@ angular–momentum difference between placing $m_{\rm acc}$ at the donor and at
 the accretor (both at the donor velocity) and applies a minimal pure‐torque
 velocity correction to enforce $\Delta L_{\rm acc}=0$.
 
-\paragraph{Donor radius evolution (optional).}
-If the donor supplies \texttt{rlmt\_R\_slope}$=\alpha_R\ne0$, its radius is
-updated after each sub–step via a power law
+\paragraph{Linear momentum (exact).}
+Conservative accretion is treated internally: $m_{\rm acc}$ is added to the
+accretor with the donor’s instantaneous velocity, while the donor’s mass is
+reduced; this leaves the pair’s total momentum unchanged. 
+When systemic wind is present, the donor’s mass decrement already removes 
+$m_{\rm wind}\,\mathbf v_{\rm d}$. The operator then applies a uniform shift
+$-\,m_{\rm wind}(\mathbf v_{\rm loss}-\mathbf v_{\rm emit})$ to both stars, 
+with
 \[
-R_{\rm d}(M) = R_{\rm ref}\left(\frac{M}{M_{\rm ref}}\right)^{\alpha_R},
+\mathbf v_{\rm emit} =
+\begin{cases}
+\mathbf v_{\rm d}, & \text{modes 0 and 3},\\
+\mathbf v_{\rm a}, & \text{mode 1},\\
+\mathbf 0, & \text{mode 2},
+\end{cases}
 \]
-where \texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to
-the donor’s current values if not provided.
+so that the total momentum change is
+\[
+\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm d} 
+-\,m_{\rm wind}(\mathbf v_{\rm loss}-\mathbf v_{\rm emit}).
+\]
+Hence $\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$ holds
+\emph{only} for modes 0 and 3 (where $\mathbf v_{\rm emit}=\mathbf v_{\rm d}$).
+
+
+%\paragraph{Donor radius evolution (optional).}
+%If the donor supplies \texttt{rlmt\_R\_slope}$=\alpha_R\ne0$, its radius is
+%updated after each sub–step via a power law
+%\[
+%R_{\rm d}(M) = R_{\rm ref}\left(\frac{M}{M_{\rm ref}}\right)^{\alpha_R},
+%\]
+%where \texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to
+%the donor’s current values if not provided.
 
 \paragraph{Inter-module flags.}
 After each sub-step the operator writes the boolean attributes
@@ -633,6 +643,9 @@ All scalar parameters are read as doubles by REBOUNDx and cast to integers for
 indices/toggles. If available in your build, a filename in
 \texttt{ce\_profile\_file} can be provided to load a CE table; otherwise the
 power–law model is used.
+
+\section{Tests and examples}
+
 
 
 
