@@ -454,6 +454,9 @@ This effect models mass transfer in compact binaries via Roche–lobe overflow
 targets robust long integrations: internal sub–stepping constrains
 $|\Delta M|/M$ and $|\Delta r|/r$, merge guards prevent divergences, and
 diagnostics expose the accumulated energy change from non–Hamiltonian updates.
+If the optional \texttt{stellar\_evolution\_sse} operator is active, it is
+invoked with $\Delta t=0$ after each sub–step so that updated masses
+immediately feed into the radius and luminosity scalings.
 
 \paragraph{Roche geometry and mass–loss law.}
 The donor’s volume–equivalent Roche radius is evaluated with the Eggleton
@@ -573,11 +576,9 @@ I(\mathcal M)=
 \ln(1/x_{\min})+\tfrac12\ln\!\bigl(1-\mathcal M^{-2}\bigr), \quad \mathcal M\ge1,
 \end{cases}
 \]
-capped by $\ln(1/x_{\min})$ for continuity. A geometric term
-$-\pi\rho R_{\rm a}^2 Q_d\,v_{\rm rel}\,\mathbf v_{\rm rel}/M_{\rm a}$ may be
-added. The envelope structure comes either from a user–supplied table
-$(s,\rho,c_s)$ (\texttt{ce\_profile\_file}) with log–log interpolation or from
-a power law $\rho=\rho_0 s^{\alpha_\rho}$, $c_s=c_{s0}s^{\alpha_{c_s}}$.
+capped by $\ln(1/x_{\min})$ for continuity. A geometric term $-\pi\rho R_{\rm a}^2 Q_d\,v_{\rm rel}\,\mathbf v_{\rm rel}/M_{\rm a}$ may be added.
+The envelope structure comes either from a user–supplied table $(s,\rho,c_s)$ (\texttt{ce\_profile\_file}) with log–log interpolation or from a power law $\rho=\rho_0 s^{\alpha_\rho}$, $c_s=c_{s0}s^{\alpha_{c_s}}$.
+The power‑law form is evaluated only when both \texttt{ce\_rho0} and \texttt{ce\_cs} are positive; otherwise the CE drag step is skipped.
 The velocity kick per sub–step is limited by
 $|\Delta\mathbf v|\le\texttt{ce\_kick\_cfl}\,c_s$.
 By default the envelope is an \emph{external} sink: no opposite reaction is
@@ -614,9 +615,9 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{rlmt\_substep\_max\_dr} (op) & — & $5\times10^{-3}$ & Max $|\Delta r|/r$ per sub–step \\
 \texttt{rlmt\_min\_substeps} (op) & int & 3 & Minimum sub–steps \\
 \texttt{ce\_profile\_file} (op) & path & — & Table $(s,\rho,c_s)$ for CE \\
-\texttt{ce\_rho0} (op) & dens & — & CE density normalisation \\
+\texttt{ce\_rho0} (op) & dens & 0 & CE density normalisation \\
 \texttt{ce\_alpha\_rho} (op) & — & 0 & Density slope \\
-\texttt{ce\_cs} (op) & speed & — & CE sound-speed normalisation \\
+\texttt{ce\_cs} (op) & speed & 0 & CE sound-speed normalisation \\
 \texttt{ce\_alpha\_cs} (op) & — & 0 & Sound-speed slope \\
 \texttt{ce\_xmin} (op) & — & $10^{-4}$ & Coulomb cutoff \\
 \texttt{ce\_Qd} (op) & — & 0 & Geometric drag coefficient \\
