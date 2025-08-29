@@ -51,7 +51,7 @@ Close binary stars evolve under a tightly coupled set of physical processes that
 
 Capturing this multi-physics landscape with a single method remains challenging. Fully three dimensional hydrodynamic calculations can resolve RLOF streams and CE flows, but they are too expensive for long-term evolution or population-scale parameter studies. Conversely, rapid binary–evolution formalisms encode RLOF, winds, magnetic braking, and gravitational–wave losses through secular prescriptions that are efficient and predictive in isolation, yet they generally assume a two-body context and cannot natively account for higher–order gravitational dynamics (e.g., triples, resonant encounters, or cluster potentials) that can modulate or even trigger mass transfer. A complementary approach is to embed vetted secular and dissipative processes within a high-accuracy $N$-body integrator so that orbital dynamics, spin evolution, and mass exchange proceed self-consistently on a common timestep while preserving the bookkeeping demanded by conservation laws.
 
-This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF and CE module that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific angular momentum prescriptions for escaping gas, with optional donor mass–radius responses following power–law scalings \citep{Eggleton1983,Ritter1988,Hurley2000}; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections providing conservative 2\,PN point–mass and spin–spin terms and 2.5\,PN gravitational–wave radiation reaction \citep{Peters1964,Kidder1995}; 1\,PN and spin--orbit (1.5\,PN) effects are available via the \texttt{gr\_full} and \texttt{lense\_thirring} modules. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
+This paper presents a suite of new binary–evolution modules implemented in the \textsc{REBOUNDx} extension to the \textsc{REBOUND} $N$-body framework. The modules target the dominant channels relevant to close binaries: (i) a momentum–conserving RLOF and CE module that combines conservative transfer with non-conservative systemic mass loss and supports multiple specific angular momentum prescriptions for escaping gas; (ii) a magnetic–braking operator implementing the Verbunt–Zwaan/Kawaler torque with a saturation branch appropriate for rapidly rotating convective envelopes \citep{Verbunt1981,Kawaler1988}; (iii) isotropic stellar–wind mass loss following the Reimers scaling \citep{Reimers1975}; (iv) thermally driven (Parker-like) winds parameterized by heating efficiency; and (v) post-Newtonian (PN) corrections providing conservative 2\,PN point–mass and spin–spin terms and 2.5\,PN gravitational–wave radiation reaction \citep{Peters1964,Kidder1995}; 1\,PN and spin--orbit (1.5\,PN) effects are available via the \texttt{gr\_full} and \texttt{lense\_thirring} modules. Each operator is designed to be unit–agnostic and exposes minimal, physically interpretable parameters that can be calibrated or varied systematically.
 
 Algorithmically, the RLOF/CE module tracks all linear–momentum channels associated with accretion and systemic mass loss and applies a minimal corrective kick to maintain angular–momentum consistency, while adaptive sub-stepping limits the fractional changes in mass and separation per internal step to ensure numerical stability near contact. CE drag is modeled with a Mach-number–dependent dynamical-friction prescription capped by a CFL-like limiter to avoid excessive velocity impulses \citep{Ostriker1999}. The wind and magnetic-braking operators act directly on particle masses and spin vectors, respectively, with safeguards against overshoot in the spin update. The PN module follows the harmonic-gauge two-body equations of motion \citep{Kidder1995} and is split into configurable orders, enabling controlled experiments that isolate conservative precession from dissipative inspiral.
 
@@ -547,14 +547,6 @@ Hence $\Delta \mathbf P = -\,m_{\rm wind}\,\mathbf v_{\rm loss}$ holds
 \emph{only} for modes 0 and 3 (where $\mathbf v_{\rm emit}=\mathbf v_{\rm d}$).
 
 
-%\paragraph{Donor radius evolution (optional).}
-%If the donor supplies \texttt{rlmt\_R\_slope}$=\alpha_R\ne0$, its radius is
-%updated after each sub–step via a power law
-%\[
-%R_{\rm d}(M) = R_{\rm ref}\left(\frac{M}{M_{\rm ref}}\right)^{\alpha_R},
-%\]
-%where \texttt{rlmt\_R\_ref\_mass} and \texttt{rlmt\_R\_ref\_radius} default to
-%the donor’s current values if not provided.
 
 \paragraph{Inter-module flags.}
 After each sub-step the operator writes the boolean attributes
@@ -631,8 +623,6 @@ Name (scope) & Unit & Default & Purpose \\
 \texttt{ce\_kick\_cfl} (op) & — & 1 & Velocity–kick limiter \\
 \texttt{ce\_reaction\_on\_donor} (op) & bool & 0 & Apply opposite CE kick to donor \\
 \texttt{merge\_eps} (op) & length & $0.5\min(R_\ast,R_{\rm a})$ & Merge radius (with floor) \\
-\texttt{rlmt\_R\_slope} (part) & — & 0 & Donor mass–radius exponent $\alpha_R$ \\
-\texttt{rlmt\_R\_ref\_mass}, \texttt{rlmt\_R\_ref\_radius} (part) & M, L & donor’s & $R(M)$ references \\
 \texttt{rlmt\_last\_dE} (op, out) & energy & — & Energy change (diagnostic) \\
 \bottomrule
 \end{tabular}
