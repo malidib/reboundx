@@ -432,6 +432,22 @@ The toggles \texttt{pn\_2PN}, and \texttt{pn\_25PN}
 (default 1) enable the corresponding sectors. Particle parameter
 \texttt{pn\_spin} is a \texttt{reb\_vec3d} storing the physical spin vector.
 
+\begin{table}[h]
+\centering\footnotesize
+\caption{Post-Newtonian parameters}
+\label{tab:pn}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Name (scope) & Unit & Default & Purpose \\
+\midrule
+\texttt{c} (force) & speed & --- & Speed of light (required) \\
+\texttt{pn\_2PN} (force) & bool & 1 & Enable 2\,PN point-mass + spin--spin \\
+\texttt{pn\_25PN} (force) & bool & 1 & Enable 2.5\,PN radiation reaction \\
+\texttt{pn\_spin} (part, vec) & ang. mom. & --- & Physical spin vector $S$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \paragraph{Momentum conservation and scope.}
 Accelerations are built for the relative coordinate and split between bodies
 in proportion to their masses, preserving total linear momentum.
@@ -598,6 +614,9 @@ $r\le\varepsilon_{\rm merge}$ (user parameter \texttt{merge\_eps} or the
 default $0.5\min(R_\ast,R_{\rm a})$ with a small positive floor). The operator
 purges zero–mass particles and detaches itself if either component vanishes.
 After mass or drag updates the system is recentered on the centre of mass.
+If the optional \texttt{stellar\_evolution\_sse} operator is present, it is
+invoked with a zero timestep after each sub-step so that changes in mass
+immediately refresh the stellar radii and luminosities.
 The accumulated energy change $\Delta E$ over the call is exported as
 \texttt{rlmt\_last\_dE} for diagnostics; because the scheme includes physical
 sinks (wind, drag) this value is not expected to vanish.
