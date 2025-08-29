@@ -454,6 +454,8 @@ This effect models mass transfer in compact binaries via Roche–lobe overflow
 targets robust long integrations: internal sub–stepping constrains
 $|\Delta M|/M$ and $|\Delta r|/r$, merge guards prevent divergences, and
 diagnostics expose the accumulated energy change from non–Hamiltonian updates.
+After each sub–step, the simulation is moved to the updated centre of mass so
+that the orbital elements reflect the redistributed mass and momentum.
 
 \paragraph{Roche geometry and mass–loss law.}
 The donor’s volume–equivalent Roche radius is evaluated with the Eggleton
@@ -591,6 +593,7 @@ $|\Delta r|/r\le\texttt{rlmt\_substep\_max\_dr}$. A merge guard triggers when
 $r\le\varepsilon_{\rm merge}$ (user parameter \texttt{merge\_eps} or the
 default $0.5\min(R_\ast,R_{\rm a})$ with a small positive floor). The operator
 purges zero–mass particles and detaches itself if either component vanishes.
+After mass or drag updates the system is recentered on the centre of mass.
 The accumulated energy change $\Delta E$ over the call is exported as
 \texttt{rlmt\_last\_dE} for diagnostics; because the scheme includes physical
 sinks (wind, drag) this value is not expected to vanish.
