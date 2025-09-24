@@ -127,7 +127,7 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "ye_spin_axis_x", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ye_spin_axis_y", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "ye_spin_axis_z", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "OmegaMag", REBX_TYPE_VEC3D);
+    rebx_register_param(rebx, "OmegaMag", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "Omega", REBX_TYPE_VEC3D);
     rebx_register_param(rebx, "k2", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "I", REBX_TYPE_DOUBLE);
@@ -152,6 +152,11 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "rlmt_Hp", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "rlmt_mdot0", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "rlmt_loss_fraction", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "rlmt_last_dE", REBX_TYPE_DOUBLE);
+
+    rebx_register_param(rebx, "rlof_active", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "inside_CE", REBX_TYPE_DOUBLE);
+        
     rebx_register_param(rebx, "jloss_mode", REBX_TYPE_INT);
     rebx_register_param(rebx, "jloss_factor", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "rlmt_skip_in_CE", REBX_TYPE_INT);
@@ -184,13 +189,13 @@ void rebx_register_default_params(struct rebx_extras* rebx){
     rebx_register_param(rebx, "tdw_alpha_L", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "tdw_alpha_M", REBX_TYPE_DOUBLE);
     rebx_register_param(rebx, "tdw_max_dlnM", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_L", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_const", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_Msun", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_Lsun", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_LEdd_coeff", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_year", REBX_TYPE_DOUBLE);
-    rebx_register_param(rebx, "eddw_max_dlnM", REBX_TYPE_DOUBLE);
+
+    rebx_register_param(rebx, "edw_const", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "edw_Msun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "edw_Lsun", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "edw_Ledd_coeff", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "edw_year", REBX_TYPE_DOUBLE);
+    rebx_register_param(rebx, "edw_max_dlnM", REBX_TYPE_DOUBLE);
     // Simplified stellar evolution operator
     // Global constants
     rebx_register_param(rebx, "sse_Msun", REBX_TYPE_DOUBLE);

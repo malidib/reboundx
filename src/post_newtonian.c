@@ -1,6 +1,7 @@
 /**
  * @file    post_newtonian.c
- * @brief   Post-Newtonian relativistic corrections: 2PN (PM+SS), 2.5PN (RR).
+ * @brief   Post-Newtonian relativistic corrections: 2PN (PM+SS), 2.5PN (RR),
+ *          with optional pre-pass particle merging.
  *
  * Implements the harmonic-coordinate point-mass equations of motion from
  * Kidder (1995, Phys. Rev. D 52, 821) for every massive pair, *omitting 1PN*.
@@ -10,9 +11,12 @@
  *
  * Effect parameters
  * -----------------
- * c        (double, required)  – speed of light in simulation units
- * pn_2PN   (double,bool, opt.) – include 2 PN terms (PM + SS)   (default: 1)
- * pn_25PN  (double,bool, opt.) – include 2.5 PN terms           (default: 1)
+ * c              (double, required)  – speed of light in simulation units
+ * pn_2PN         (double,bool, opt.) – include 2 PN terms (PM + SS)   (default: 1)
+ * pn_25PN        (double,bool, opt.) – include 2.5 PN terms           (default: 1)
+ * pn_merge_dist  (double, opt.)      – if > 0, merge any pair with r <= pn_merge_dist
+ *                                       (in simulation length units). If 0.0 or unset,
+ *                                       only merge if distance <= 0 (exact coincidence).
  *
  * Particle parameters
  * -------------------
@@ -24,6 +28,8 @@
  *    spins χ_i, set S_i = χ_i * (G m_i^2 / c) in the simulation's unit system.
  *  • This effect updates *accelerations only*; spin precession ODEs are not
  *    included here.
+ *  • Merging happens *before* PN accelerations are computed on each force call.
+ *    After any merge, integrator caches are reset via reb_simulation_integrator_reset().
  */
 
 #include <math.h>
@@ -37,6 +43,100 @@ typedef struct reb_vec3d reb_vec3d;
 #endif
 
 /* ------------------------------------------------------------------------- */
+/* Helper: merge particle j into i, conserving mass/momentum/volume and spin */
+/* ------------------------------------------------------------------------- */
+static inline int merge_two_particles(struct reb_simulation* const sim,
+                                      const int i,
+                                      const int j)
+{
+    struct reb_particle* const p  = sim->particles;
+    struct reb_particle* const pi = &p[i];
+    struct reb_particle* const pj = &p[j];
+
+    const double mi = pi->m;
+    const double mj = pj->m;
+    const double m  = mi + mj;
+
+    /* Center-of-mass position and velocity; conserve linear momentum exactly */
+    if (m > 0.0){
+        const double invm = 1.0/m;
+        const double x  = (mi*pi->x  + mj*pj->x ) * invm;
+        const double y  = (mi*pi->y  + mj*pj->y ) * invm;
+        const double z  = (mi*pi->z  + mj*pj->z ) * invm;
+        const double vx = (mi*pi->vx + mj*pj->vx) * invm;
+        const double vy = (mi*pi->vy + mj*pj->vy) * invm;
+        const double vz = (mi*pi->vz + mj*pj->vz) * invm;
+
+        pi->x = x;  pi->y = y;  pi->z = z;
+        pi->vx = vx; pi->vy = vy; pi->vz = vz;
+        pi->m  = m;
+    } else {
+        /* If both masses are zero, keep i as-is and carry on. */
+        pi->m = 0.0;
+    }
+
+    /* Conserve "volume" for radius: R_new^3 = R_i^3 + R_j^3 (if radii set) */
+    if (pi->r > 0.0 || pj->r > 0.0){
+        const double r3 = pi->r*pi->r*pi->r + pj->r*pj->r*pj->r;
+        pi->r = (r3 > 0.0) ? cbrt(r3) : 0.0;
+    }
+
+    /* Sum PN spin vectors if present */
+    struct rebx_extras* const rx = sim->extras;
+    const reb_vec3d* Spi = rebx_get_param_vec(rx, pi->ap, "pn_spin");
+    const reb_vec3d* Spj = rebx_get_param_vec(rx, pj->ap, "pn_spin");
+    if (Spi || Spj){
+        reb_vec3d Snew = (reb_vec3d){0.0, 0.0, 0.0};
+        if (Spi){ Snew.x += Spi->x; Snew.y += Spi->y; Snew.z += Spi->z; }
+        if (Spj){ Snew.x += Spj->x; Snew.y += Spj->y; Snew.z += Spj->z; }
+        /* Store on survivor; create param if missing */
+        rebx_set_param_vec3d(rx, &pi->ap, "pn_spin", Snew);
+    }
+
+    /* Remove j (keep array sorted) */
+    reb_simulation_remove_particle(sim, j, 1);
+    return 1;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Optional pre-pass: merge coincident or near-coincident pairs              */
+/* If merge_dist > 0: merge when r^2 <= merge_dist^2                         */
+/* Else:             merge only when r^2 <= 0 (exact coincidence)            */
+/* Returns 1 if any merge occurred, 0 otherwise.                              */
+/* ------------------------------------------------------------------------- */
+static int merge_pairs_prepass(struct reb_simulation* const sim,
+                               const double merge_dist)
+{
+    const int use_threshold = (merge_dist > 0.0);
+    const double rcrit2 = use_threshold ? merge_dist*merge_dist : 0.0;
+
+    int merged_any = 0;
+
+    for (int i = 0; i < sim->N; i++){
+        int j = i + 1;
+        while (j < sim->N){
+            const struct reb_particle* const pi = &sim->particles[i];
+            const struct reb_particle* const pj = &sim->particles[j];
+
+            const double dx = pi->x - pj->x;
+            const double dy = pi->y - pj->y;
+            const double dz = pi->z - pj->z;
+            const double r2 = dx*dx + dy*dy + dz*dz;
+
+            /* Merge if exactly coincident (r2 <= 0) or under threshold */
+            if (r2 <= rcrit2){
+                merge_two_particles(sim, i, j);
+                merged_any = 1;
+                /* do not increment j: new particle at index j now */
+                continue;
+            }
+            j++;
+        }
+    }
+    return merged_any;
+}
+
+/* ------------------------------------------------------------------------- */
 /* Pair-wise relative acceleration builder                                   */
 /* ------------------------------------------------------------------------- */
 static inline void pn_add_pair(struct reb_simulation* const sim,
@@ -47,7 +147,7 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
                                const int                    do2PN,
                                const int                    do25PN)
 {
-    /* Mass guards: PN is defined for massive pairs only */
+    /* PN defined for massive pairs only */
     if (!(pi->m > 0.0 && pj->m > 0.0)) return;
 
     /* Relative separation & velocity */
@@ -146,7 +246,7 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
     }
 
     /* --------------------------------------------------------------------- */
-    /* Symmetric back‑reaction on each body (maps relative accel to bodies)   */
+    /* Map relative acceleration to body accelerations (action-reaction)     */
     /* --------------------------------------------------------------------- */
     const double fac_i = pj->m / m;
     const double fac_j = pi->m / m;
@@ -160,19 +260,30 @@ static inline void pn_add_pair(struct reb_simulation* const sim,
 /* Force-kernel wrapper called by REBOUNDx                                   */
 /* ------------------------------------------------------------------------- */
 static void rebx_calculate_post_newtonian(struct reb_simulation* const sim,
-                                          struct reb_particle*   const particles,
-                                          const int                        N,
+                                          struct reb_particle*   const particles, /* not used directly after prepass */
+                                          const int                        N,     /* not used directly after prepass */
                                           const double                     c,
                                           const int                        do2PN,
-                                          const int                        do25PN)
+                                          const int                        do25PN,
+                                          const double                     merge_dist)
 {
+    (void)particles; /* silence potential warnings */
+    (void)N;
+
     const double G = sim->G;
     if (!(isfinite(G) && isfinite(c) && c > 0.0)) return;
 
-    for (int i = 0; i < N; i++){
-        for (int j = i+1; j < N; j++){
-            pn_add_pair(sim, &particles[i], &particles[j],
-                        G, c, do2PN, do25PN);
+    /* ---- Pre-pass: merge pairs if coincident or within pn_merge_dist ---- */
+    const int merged_any = merge_pairs_prepass(sim, merge_dist);
+
+
+    /* ---- PN accelerations on the updated system ---- */
+    const int Nnow = sim->N;
+    struct reb_particle* const pnow = sim->particles;
+
+    for (int i = 0; i < Nnow; i++){
+        for (int j = i+1; j < Nnow; j++){
+            pn_add_pair(sim, &pnow[i], &pnow[j], G, c, do2PN, do25PN);
         }
     }
 }
@@ -194,6 +305,7 @@ void rebx_post_newtonian(struct reb_simulation* const sim,
     }
 
     int do2PN = 1, do25PN = 1;
+    double merge_dist = 0.000; /* default: off (exact coincidence only) */
 
     const double* d;
 
@@ -203,5 +315,9 @@ void rebx_post_newtonian(struct reb_simulation* const sim,
     d = rebx_get_param(rx, force->ap, "pn_25PN");
     if (d) do25PN = (*d != 0.0);
 
-    rebx_calculate_post_newtonian(sim, particles, N, *c_ptr, do2PN, do25PN);
+    /* Optional: user-set merge distance (simulation length units) */
+    d = rebx_get_param(rx, force->ap, "pn_merge_dist");
+    if (d && isfinite(*d) && *d >= 0.0) merge_dist = *d;
+
+    rebx_calculate_post_newtonian(sim, particles, N, *c_ptr, do2PN, do25PN, merge_dist);
 }

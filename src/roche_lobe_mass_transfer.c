@@ -4,7 +4,7 @@
  *          with momentum‑exact mass transfer, controlled j‑loss,
  *          optional CE reaction, adaptive sub‑stepping, and diagnostics.
  *
- *          2025‑08‑15  (fully corrected)
+ *          2025‑08‑15  (fully corrected, drop‑in replacement)
  *
  * Operator parameters (all optional unless stated)
  * ------------------------------------------------
@@ -30,15 +30,6 @@
  * rlmt_Hp               (double, donor)     – pressure scale height H_P
  * rlmt_mdot0            (double, donor)     – reference mass‑loss rate \dot M_0  (>0)
  *
- * To supply mass‑dependent stellar properties, combine this operator with
- * `stellar_evolution_sse`, which updates each star's radius and luminosity via
- *
- *     R = R_coeff R_\odot (M/M_\odot)^{R_exp},
- *     L = L_coeff L_\odot (M/M_\odot)^{L_exp}.
- *
- * The update is purely algebraic: the timestep is ignored and the relations
- * are evaluated using the particle's current mass each call.
- *
  * CE power‑law (operator scope; used if no table)
  * -----------------------------------------------
  * ce_rho0               (double)            – density normalization
@@ -63,11 +54,12 @@
 #include "reboundx.h"
 
 #ifndef RLMT_EXP_CLAMP
-#define RLMT_EXP_CLAMP  80.0     /* prevents exp() overflow in Ritter law        */
+#define RLMT_EXP_CLAMP  80.0     /* prevents exp() overflow/underflow in Ritter law */
 #endif
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
+
 #define MAX2(a,b) (( (a) > (b) ) ? (a) : (b))
 #define MIN2(a,b) (( (a) < (b) ) ? (a) : (b))
 
@@ -85,6 +77,36 @@ struct ce_profile {
     double* rho;    /* density */
     double* cs;     /* sound speed */
 };
+
+
+
+/* Robustly read an index parameter that may be stored as int or double. */
+static int read_index_param_any(struct reb_simulation* sim,
+                                struct rebx_extras* rx, struct rebx_param* ap,
+                                const char* name, int* out_idx){
+    /* rebx_get_param returns a pointer to the storage (type depends on registration). */
+    const void* p = (const void*) rebx_get_param(rx, ap, name);
+    if(!p) return 0;
+
+    /* Try reading as int first (matches many REBOUNDx operator registrations). */
+    int vi = 0;
+    memcpy(&vi, p, sizeof(int));
+    if(vi >= 0 && vi < sim->N){
+        *out_idx = vi;
+        return 1;
+    }
+
+    /* Fallback: read as double (older/alternate registrations). */
+    double vd = 0.0;
+    memcpy(&vd, p, sizeof(double));
+    if(isfinite(vd) && vd >= -0.5 && vd < (double)sim->N - 0.5){
+        *out_idx = (int) llround(vd);
+        return 1;
+    }
+    return 0;
+}
+
+
 static struct ce_profile ce_tab = {0, NULL, NULL, NULL};
 
 /* Load (s, rho, cs) ASCII table. Returns 1 on success, 0 otherwise. */
@@ -228,6 +250,13 @@ static double I_prefactor(const double M, const double xmin){
     }
 }
 
+/* Clamp helper for exponent in Ritter law */
+static inline double clamp_expo(double x){
+    if(x >  RLMT_EXP_CLAMP) return  RLMT_EXP_CLAMP;
+    if(x < -RLMT_EXP_CLAMP) return -RLMT_EXP_CLAMP;
+    return x;
+}
+
 /* ========================================================================= */
 void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                                    struct rebx_operator*     const op,
@@ -238,16 +267,20 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
     struct rebx_extras* const rx = sim->extras;
 
     /* ---------------------- required indices (as doubles) ---------------------- */
-    const double* d_donor = rebx_get_param(rx, op->ap, "rlmt_donor");
-    const double* d_accr  = rebx_get_param(rx, op->ap, "rlmt_accretor");
-    if(!d_donor || !d_accr){
-        reb_simulation_error(sim, "[rlmt] Need rlmt_donor and rlmt_accretor (double indices).");
+    int donor_idx = -1, acc_idx = -1;
+    if(!read_index_param_any(sim, rx, op->ap, "rlmt_donor",    &donor_idx) ||
+       !read_index_param_any(sim, rx, op->ap, "rlmt_accretor", &acc_idx)){
+        reb_simulation_error(sim,
+            "[rlmt] Missing/invalid rlmt_donor/rlmt_accretor. Set on this operator; "
+            "accepted types are int or double; require 0 ≤ idx < N and donor≠accretor.");
         return;
     }
-    const int donor_idx = (int) llround(*d_donor);
-    const int acc_idx   = (int) llround(*d_accr);
     if(donor_idx < 0 || acc_idx < 0 || donor_idx >= sim->N || acc_idx >= sim->N || donor_idx == acc_idx){
-        reb_simulation_error(sim, "[rlmt] rlmt_donor/rlmt_accretor out of range or identical.");
+        char buf[256];
+        snprintf(buf, sizeof(buf),
+                 "[rlmt] rlmt_donor/rlmt_accretor out of range or identical. N=%d, donor=%d, accretor=%d",
+                 sim->N, donor_idx, acc_idx);
+        reb_simulation_error(sim, buf);
         return;
     }
     struct reb_particle* d = &sim->particles[donor_idx];
@@ -263,7 +296,8 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
 
     const double* p_jmode  = rebx_get_param(rx, op->ap, "jloss_mode");
     const double* p_jfac   = rebx_get_param(rx, op->ap, "jloss_factor");
-    const int     jloss_mode   = p_jmode ? (int) llround(*p_jmode) : 0;
+    int     jloss_mode   = p_jmode ? (int) llround(*p_jmode) : 0;
+    if(jloss_mode < 0 || jloss_mode > 3) jloss_mode = 0;
     const double  jloss_factor = p_jfac  ? *p_jfac : 1.0;
 
     const double* p_skipCE = rebx_get_param(rx, op->ap, "rlmt_skip_in_CE");
@@ -276,10 +310,11 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
     const double* p_merge  = rebx_get_param(rx, op->ap, "merge_eps");
     const double* p_react  = rebx_get_param(rx, op->ap, "ce_reaction_on_donor");
 
-    const double dm_max_frac = p_dmmax ? *p_dmmax : 1e-3;
-    const double dr_max_frac = p_drmax ? *p_drmax : 5e-3;
-    const int    min_steps   = p_nmin  ? (int) llround(*p_nmin) : 3;
-    const double kick_cfl    = p_cfl   ? *p_cfl : 1.0;
+    const double dm_max_frac = (p_dmmax && isfinite(*p_dmmax) && *p_dmmax>0.0) ? *p_dmmax : 1e-3;
+    const double dr_max_frac = (p_drmax && isfinite(*p_drmax) && *p_drmax>0.0) ? *p_drmax : 5e-3;
+    int          min_steps   = (p_nmin  && isfinite(*p_nmin )) ? (int) llround(*p_nmin) : 3;
+    if(min_steps < 1) min_steps = 1;
+    const double kick_cfl    = (p_cfl   && isfinite(*p_cfl  ) && *p_cfl>=0.0) ? *p_cfl : 1.0;
     const int    ce_react_on_donor = p_react ? (int) llround(*p_react) : 0;
 
     /* optional CE profile table (loaded once) */
@@ -380,14 +415,13 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
         /* Flag CE and RLOF status for stand-alone wind operators */
         const int in_CE   = (r < d->r);
         const int rlof_on = (d->r > RL);
-        rebx_set_param_double(rx, d->ap, "inside_CE",  in_CE   ? 1.0 : 0.0);
-        rebx_set_param_double(rx, a->ap, "inside_CE",  in_CE   ? 1.0 : 0.0);
-        rebx_set_param_double(rx, d->ap, "rlof_active", rlof_on ? 1.0 : 0.0);
-        rebx_set_param_double(rx, a->ap, "rlof_active", rlof_on ? 1.0 : 0.0);
+        rebx_set_param_double(rx, &d->ap, "inside_CE",  in_CE   ? 1.0 : 0.0);
+        rebx_set_param_double(rx, &a->ap, "inside_CE",  in_CE   ? 1.0 : 0.0);
+        rebx_set_param_double(rx, &d->ap, "rlof_active", rlof_on ? 1.0 : 0.0);
+        rebx_set_param_double(rx, &a->ap, "rlof_active", rlof_on ? 1.0 : 0.0);
 
         /* Ritter mass‑loss estimate for step limiting */
-        double expo = (d->r - RL) / Hp;
-        if(expo > RLMT_EXP_CLAMP) expo = RLMT_EXP_CLAMP;
+        double expo = clamp_expo( (d->r - RL) / Hp );
         double mdot_est = -mdot0 * exp(expo);  /* <0 when overflowing */
 
         if(mdot_est != 0.0){
@@ -412,52 +446,60 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
         /* ===================================================================== */
         if(!(skip_in_CE && r < d->r)){
             /* Conservative mass loss from donor */
-            expo = (d->r - RL) / Hp; if(expo > RLMT_EXP_CLAMP) expo = RLMT_EXP_CLAMP;
+            expo = clamp_expo( (d->r - RL) / Hp );
             const double mdot = -mdot0 * exp(expo);   /* <0 => donor losing mass */
             double dM   = mdot * dt;                  /* negative */
-            if(d->m + dM <= 0.0) dM = -d->m + (-1e-30);  /* leave tiny positive */
+            /* Ensure we never cross to negative mass in a single sub-step. */
+            /* Leave a tiny positive floor to avoid immediate purge by <=0 test. */
+            if (d->m + dM <= 0.0){
+                dM = -(d->m - 1e-30);  /* new mass will be +1e-30 */
+            }
 
             const double m_loss = -dM;                /* >0: donor mass decrease */
             const double m_wind = f_loss * m_loss;    /* escapes system */
             const double m_acc  = m_loss - m_wind;    /* accreted internally */
 
-              /* Compute v_loss according to jloss_mode */
-              double vx_loss, vy_loss, vz_loss;
-              if(jloss_mode == 1){
-                  vx_loss = a->vx; vy_loss = a->vy; vz_loss = a->vz;
-              } else if(jloss_mode == 2){
-                  const double Mtot = Md0 + Ma0;
-                  vx_loss = (Md0*d->vx + Ma0*a->vx) / Mtot;
-                  vy_loss = (Md0*d->vy + Ma0*a->vy) / Mtot;
-                  vz_loss = (Md0*d->vz + Ma0*a->vz) / Mtot;
-              } else if(jloss_mode == 3){
-                  /* choose tangential unit vector and set |Δv| to achieve target j */
-                  double exu, eyu, ezu; unit_perp_to(nx, ny, nz, &exu, &eyu, &ezu);
-                  /* h = |r × v_rel|; J/M = (μ h)/Mtot */
-                  double Lx, Ly, Lz; cross3(dx, dy, dz, vrelx, vrely, vrelz, &Lx, &Ly, &Lz);
-                  const double Lmag  = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99; /* h */
-                  const double Mtot  = Md0 + Ma0;
-                  const double mu    = (Md0*Ma0) / Mtot;
-                  const double j_orb = (mu * Lmag) / Mtot;                  /* J/M */
-                  const double j_target = jloss_factor * j_orb;
-                  const double fac = j_target / r;  /* speed to achieve j_target at donor radius */
-                  vx_loss = d->vx + fac*exu;
-                  vy_loss = d->vy + fac*eyu;
-                  vz_loss = d->vz + fac*ezu;
-              } else {
-                  /* mode 0: donor wind */
-                  vx_loss = d->vx; vy_loss = d->vy; vz_loss = d->vz;
-              }
+            /* Compute v_loss according to jloss_mode */
+            double vx_loss, vy_loss, vz_loss;
+            if(jloss_mode == 1){
+                vx_loss = a->vx; vy_loss = a->vy; vz_loss = a->vz;
+            } else if(jloss_mode == 2){
+                const double Mtot = Md0 + Ma0;
+                if(Mtot > 0.0){
+                    vx_loss = (Md0*d->vx + Ma0*a->vx) / Mtot;
+                    vy_loss = (Md0*d->vy + Ma0*a->vy) / Mtot;
+                    vz_loss = (Md0*d->vz + Ma0*a->vz) / Mtot;
+                } else {
+                    vx_loss = vy_loss = vz_loss = 0.0;
+                }
+            } else if(jloss_mode == 3){
+                /* choose tangential unit vector and set |Δv| to achieve target j */
+                double exu, eyu, ezu; unit_perp_to(nx, ny, nz, &exu, &eyu, &ezu);
+                /* h = |r × v_rel|; J/M = (μ h)/Mtot */
+                double Lx, Ly, Lz; cross3(dx, dy, dz, vrelx, vrely, vrelz, &Lx, &Ly, &Lz);
+                const double Lmag  = sqrt(Lx*Lx + Ly*Ly + Lz*Lz) + 1e-99; /* h */
+                const double Mtot  = Md0 + Ma0;
+                const double mu    = (Md0*Ma0) / MAX2(Mtot, 1e-99);
+                const double j_orb = (mu * Lmag) / MAX2(Mtot, 1e-99);     /* J/M */
+                const double j_target = jloss_factor * j_orb;
+                const double fac = j_target / r;  /* speed to achieve j_target at donor radius */
+                vx_loss = d->vx + fac*exu;
+                vy_loss = d->vy + fac*eyu;
+                vz_loss = d->vz + fac*ezu;
+            } else {
+                /* mode 0: donor wind */
+                vx_loss = d->vx; vy_loss = d->vy; vz_loss = d->vz;
+            }
 
-              /* identify the emission site's velocity */
-              double vx_emit, vy_emit, vz_emit;
-              if(jloss_mode == 1){
-                  vx_emit = a->vx; vy_emit = a->vy; vz_emit = a->vz;
-              } else if(jloss_mode == 2){
-                  vx_emit = vy_emit = vz_emit = 0.0;
-              } else {
-                  vx_emit = d->vx; vy_emit = d->vy; vz_emit = d->vz;
-              }
+            /* identify the emission site's velocity */
+            double vx_emit, vy_emit, vz_emit;
+            if(jloss_mode == 1){
+                vx_emit = a->vx; vy_emit = a->vy; vz_emit = a->vz;
+            } else if(jloss_mode == 2){
+                vx_emit = vy_emit = vz_emit = 0.0;
+            } else {
+                vx_emit = d->vx; vy_emit = d->vy; vz_emit = d->vz;
+            }
 
             /* --- Mass updates --- */
             const double Md1 = Md0 - m_loss;       /* donor mass after loss */
@@ -473,15 +515,17 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                 /* Donor velocity unchanged; donor momentum reduced implicitly by mass loss. */
             }
 
-              /* --- External wind: remove momentum −m_wind (v_loss − v_emit) --- */
-              if(m_wind > 0.0){
-                  const double Mtot1 = Md1 + Ma1;
-                  const double dVx = -(m_wind * (vx_loss - vx_emit)) / Mtot1;
-                  const double dVy = -(m_wind * (vy_loss - vy_emit)) / Mtot1;
-                  const double dVz = -(m_wind * (vz_loss - vz_emit)) / Mtot1;
-                  d->vx += dVx; d->vy += dVy; d->vz += dVz;
-                  a->vx += dVx; a->vy += dVy; a->vz += dVz;
-              }
+            /* --- External wind: remove momentum −m_wind (v_loss − v_emit) --- */
+            if(m_wind > 0.0){
+                const double Mtot1 = Md1 + Ma1;
+                if(Mtot1 > 0.0){
+                    const double dVx = -(m_wind * (vx_loss - vx_emit)) / Mtot1;
+                    const double dVy = -(m_wind * (vy_loss - vy_emit)) / Mtot1;
+                    const double dVz = -(m_wind * (vz_loss - vz_emit)) / Mtot1;
+                    d->vx += dVx; d->vy += dVy; d->vz += dVz;
+                    a->vx += dVx; a->vy += dVy; a->vz += dVz;
+                }
+            }
 
             /* --- Conservative ΔL correction for transferred (accreted) mass --- */
             if(m_acc > 0.0){
@@ -512,41 +556,41 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                 }
             }
 
-              /* --- Wind angular-momentum removal: enforce ΔL_wind explicitly --- */
-              if(m_wind > 0.0){
-                  /* R_cm after updates */
-                  const double Rcmx = (d->m*d->x + a->m*a->x) / (d->m + a->m);
-                  const double Rcmy = (d->m*d->y + a->m*a->y) / (d->m + a->m);
-                  const double Rcmz = (d->m*d->z + a->m*a->z) / (d->m + a->m);
-                  double rex, rey, rez;  /* emission point relative to COM */
-                  if(jloss_mode == 1){      /* accretor wind */
-                      rex = a->x - Rcmx; rey = a->y - Rcmy; rez = a->z - Rcmz;
-                  } else if(jloss_mode == 2){ /* COM-loss (zero-j) */
-                      rex = rey = rez = 0.0;
-                  } else {                   /* donor wind or mode 3 baseline from donor */
-                      rex = d->x - Rcmx; rey = d->y - Rcmy; rez = d->z - Rcmz;
-                  }
+            /* --- Wind angular-momentum removal: enforce ΔL_wind explicitly --- */
+            if(m_wind > 0.0){
+                /* R_cm after updates */
+                const double Rcmx = (d->m*d->x + a->m*a->x) / (d->m + a->m);
+                const double Rcmy = (d->m*d->y + a->m*a->y) / (d->m + a->m);
+                const double Rcmz = (d->m*d->z + a->m*a->z) / (d->m + a->m);
+                double rex, rey, rez;  /* emission point relative to COM */
+                if(jloss_mode == 1){      /* accretor wind */
+                    rex = a->x - Rcmx; rey = a->y - Rcmy; rez = a->z - Rcmz;
+                } else if(jloss_mode == 2){ /* COM-loss (zero-j) */
+                    rex = rey = rez = 0.0;
+                } else {                   /* donor wind or mode 3 baseline from donor */
+                    rex = d->x - Rcmx; rey = d->y - Rcmy; rez = d->z - Rcmz;
+                }
 
-                  /* ΔL_needed = m_wind * (r_emit × (v_loss - v_emit)) */
-                  const double dvx = vx_loss - vx_emit;
-                  const double dvy = vy_loss - vy_emit;
-                  const double dvz = vz_loss - vz_emit;
-                  double DLx, DLy, DLz;
-                  cross3(rex, rey, rez, dvx, dvy, dvz, &DLx, &DLy, &DLz);
-                  DLx *= m_wind; DLy *= m_wind; DLz *= m_wind;
+                /* ΔL_needed = m_wind * (r_emit × (v_loss - v_emit)) */
+                const double dvx = vx_loss - vx_emit;
+                const double dvy = vy_loss - vy_emit;
+                const double dvz = vz_loss - vz_emit;
+                double DLx, DLy, DLz;
+                cross3(rex, rey, rez, dvx, dvy, dvz, &DLx, &DLy, &DLz);
+                DLx *= m_wind; DLy *= m_wind; DLz *= m_wind;
 
-                  /* Apply −ΔL_needed as a pure torque on the pair */
-                  const double rax = a->x - Rcmx, ray = a->y - Rcmy, raz = a->z - Rcmz;
-                  const double ra2 = rax*rax + ray*ray + raz*raz;
-                  if(ra2 > 0.0 && a->m > 0.0 && d->m > 0.0){
-                      const double tx = -(DLy*raz - DLz*ray) / (a->m * ra2);
-                      const double ty = -(DLz*rax - DLx*raz) / (a->m * ra2);
-                      const double tz = -(DLx*ray - DLy*rax) / (a->m * ra2);
-                      a->vx += tx; a->vy += ty; a->vz += tz;
-                      const double scale = a->m / d->m;
-                      d->vx -= scale*tx; d->vy -= scale*ty; d->vz -= scale*tz;
-                  }
-              }
+                /* Apply −ΔL_needed as a pure torque on the pair */
+                const double rax = a->x - Rcmx, ray = a->y - Rcmy, raz = a->z - Rcmz;
+                const double ra2 = rax*rax + ray*ray + raz*raz;
+                if(ra2 > 0.0 && a->m > 0.0 && d->m > 0.0){
+                    const double tx = -(DLy*raz - DLz*ray) / (a->m * ra2);
+                    const double ty = -(DLz*rax - DLx*raz) / (a->m * ra2);
+                    const double tz = -(DLx*ray - DLy*rax) / (a->m * ra2);
+                    a->vx += tx; a->vy += ty; a->vz += tz;
+                    const double scale = a->m / d->m;
+                    d->vx -= scale*tx; d->vy -= scale*ty; d->vz -= scale*tz;
+                }
+            }
 
             /* --- optional stellar evolution update --- */
             struct rebx_operator* sse = rebx_get_operator(rx, "stellar_evolution_sse");
@@ -593,9 +637,8 @@ void rebx_roche_lobe_mass_transfer(struct reb_simulation* const sim,
                     double dvz = -fc * vrelz * dt;
 
                     /* Optional geometric term */
-                    const double* Qd2_ptr = Qd_ptr;
-                    if(Qd2_ptr && *Qd2_ptr > 0.0 && a->r > 0.0){
-                        const double fc_geom = M_PI * rho * a->r * a->r * vrel / a->m * (*Qd2_ptr);
+                    if(Qd_ptr && *Qd_ptr > 0.0 && a->r > 0.0){
+                        const double fc_geom = M_PI * rho * a->r * a->r * vrel / a->m * (*Qd_ptr);
                         dvx += -fc_geom * vrelx * dt;
                         dvy += -fc_geom * vrely * dt;
                         dvz += -fc_geom * vrelz * dt;
